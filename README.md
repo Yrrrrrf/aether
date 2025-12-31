@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/Yrrrrrf/prism-py/main/resources/img/dodecahedron.png" alt="Aether Icon" width="128" height="128" description="A simple dodecahedron with a yellow glow!">
+  <img src="https://raw.githubusercontent.com/Yrrrrrf/aether/main/resources/img/dodecahedron.png" alt="Aether Icon" width="128" height="128" description="A simple dodecahedron with a yellow glow!">
   <div align="center">AETHER</div>
 </h1>
 
