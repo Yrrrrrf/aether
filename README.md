@@ -18,35 +18,49 @@
 
 ## Overview
 
-**Aether** is a next-generation TypeScript library that projects your PostgreSQL database directly into your frontend code. It acts as a "Phantom" layer—intercepting property access and translating it into efficient [PostgREST](https://postgrest.org/) API calls.
+**Aether** is a next-generation TypeScript library that projects your PostgreSQL
+database directly into your frontend code. It acts as a "Phantom"
+layer—intercepting property access and translating it into efficient
+[PostgREST](https://postgrest.org/) API calls.
 
-Unlike traditional ORMs or API clients, Aether requires **zero boilerplate**. It introspects your database to generate strict TypeScript interfaces and Zod schemas, then provides a fluid, type-safe API to query your data as if it were local memory.
+Unlike traditional ORMs or API clients, Aether requires **zero boilerplate**. It
+introspects your database to generate strict TypeScript interfaces and Zod
+schemas, then provides a fluid, type-safe API to query your data as if it were
+local memory.
 
-> **Note:** Aether is the spiritual successor to `prism-ts`, refactored for modern Deno/TypeScript environments and PostgREST backends.
+> **Note:** Aether is the spiritual successor to `prism-ts`, refactored for
+> modern Deno/TypeScript environments and PostgREST backends.
 
 ## Key Features
 
-- **🔮 The Oracle**: An intelligent CLI that introspects your PostgreSQL schema and generates strict TypeScript interfaces and Zod validation schemas.
-- **👻 The Phantom**: A lightweight runtime (3KB) that uses ES6 Proxies to convert code like `db.users.findMany(...)` into optimized REST calls.
-- **🗣️ The Dialect**: A powerful Query DSL that translates complex filters (`$or`, `$in`, `$cs`) into PostgREST URL syntax automatically.
+- **🔮 The Oracle**: An intelligent CLI that introspects your PostgreSQL schema
+  and generates strict TypeScript interfaces and Zod validation schemas.
+- **👻 The Phantom**: A lightweight runtime (3KB) that uses ES6 Proxies to
+  convert code like `db.users.findMany(...)` into optimized REST calls.
+- **🗣️ The Dialect**: A powerful Query DSL that translates complex filters
+  (`$or`, `$in`, `$cs`) into PostgREST URL syntax automatically.
 - **🛡️ Type Fidelity**: Automatic handling of PostgreSQL-specific types:
   - `BigInt` → `string` (safe serialization to prevent JS number overflow).
   - `Date`/`Timestamp` → ISO 8601 strings.
   - `JSONB` → Typed interfaces.
-- **⚡ Split-Brain Routing**: Seamlessly handles standard table operations and RPC stored procedure calls via the `_plugins` namespace.
+- **⚡ Split-Brain Routing**: Seamlessly handles standard table operations and
+  RPC stored procedure calls via the `_plugins` namespace.
 
 ## Architecture
 
 Aether consists of two distinct parts:
 
-1.  **Dev-Time (The Oracle):** Connects to Port `5432` (Postgres) to read the schema.
-2.  **Runtime (The Fabric):** Connects to Port `3000` (PostgREST) to execute queries.
+1. **Dev-Time (The Oracle):** Connects to Port `5432` (Postgres) to read the
+   schema.
+2. **Runtime (The Fabric):** Connects to Port `3000` (PostgREST) to execute
+   queries.
 
 ## Quick Start
 
 ### 1. Start the Backend
 
-Use the provided Docker Compose setup to spin up a Postgres DB and a PostgREST server.
+Use the provided Docker Compose setup to spin up a Postgres DB and a PostgREST
+server.
 
 ```bash
 docker-compose up -d
@@ -73,17 +87,17 @@ const db = createAether<DB>({ baseUrl: "http://localhost:3000" });
 
 // 1. Find active users older than 21
 const users = await db.public.users.findMany({
-  where: { 
-    age: { $gt: 21 }, 
-    status: "active" 
+  where: {
+    age: { $gt: 21 },
+    status: "active",
   },
-  select: ["id", "username"] 
+  select: ["id", "username"],
 });
 
 // 2. Create a new post (BigInt safe!)
 await db.public.posts.create({
   title: "Aether is Fast",
-  views: "9007199254740995" // Safe BigInt handling
+  views: "9007199254740995", // Safe BigInt handling
 });
 ```
 
@@ -91,12 +105,12 @@ await db.public.posts.create({
 
 Aether uses a MongoDB-like syntax that maps to PostgREST operators:
 
-| Aether DSL | PostgREST | SQL Equivalent |
-| :--- | :--- | :--- |
-| `{ age: { $gt: 10 } }` | `age=gt.10` | `WHERE age > 10` |
-| `{ tags: { $cs: ["news"] } }` | `tags=cs.{news}` | `WHERE tags @> '{news}'` |
-| `{ id: { $in: [1, 2] } }` | `id=in.(1,2)` | `WHERE id IN (1, 2)` |
-| `{ $or: [{ a: 1 }, { b: 2 }] }` | `or=(a.eq.1,b.eq.2)` | `WHERE a = 1 OR b = 2` |
+| Aether DSL                      | PostgREST            | SQL Equivalent           |
+| :------------------------------ | :------------------- | :----------------------- |
+| `{ age: { $gt: 10 } }`          | `age=gt.10`          | `WHERE age > 10`         |
+| `{ tags: { $cs: ["news"] } }`   | `tags=cs.{news}`     | `WHERE tags @> '{news}'` |
+| `{ id: { $in: [1, 2] } }`       | `id=in.(1,2)`        | `WHERE id IN (1, 2)`     |
+| `{ $or: [{ a: 1 }, { b: 2 }] }` | `or=(a.eq.1,b.eq.2)` | `WHERE a = 1 OR b = 2`   |
 
 ## Project Structure
 

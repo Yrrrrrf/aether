@@ -79,7 +79,7 @@ Deno.test("Dialect - Dirty Strings in Arrays", () => {
   // Expected: tags=cs.{"\"Special\"","Back\\Slash","Amp%26Sand"}
   // Note: If we use encodeURIComponent, \ becomes %5C and " becomes %22.
   // We check for the presence of the escaped and encoded components.
-  // The visualization in the spec showed raw \ and ", but for URL safety 
+  // The visualization in the spec showed raw \ and ", but for URL safety
   // we are using encodeURIComponent.
   assertEquals(url.includes("tags=cs."), true);
   assertEquals(url.includes("%5C%22Special%5C%22"), true);

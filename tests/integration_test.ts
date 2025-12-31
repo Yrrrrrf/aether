@@ -4,7 +4,8 @@ import { PostgresIntrospector } from "../src/oracle/mod.ts";
 import { generateTypeScript } from "../src/oracle/emitters/ts.ts";
 
 // Config
-const DB_CONN = "postgres://aether_user:aether_password@localhost:5432/aether_test";
+const DB_CONN =
+  "postgres://aether_user:aether_password@localhost:5432/aether_test";
 const PGRST_URL = "http://localhost:3000";
 const GENERATED_FILE = "./tests/generated_schema.d.ts";
 
@@ -24,7 +25,6 @@ async function waitForService(url: string, retries = 5, delay = 1000) {
 }
 
 Deno.test("🌌 Aether E2E Integration Suite", async (t) => {
-  
   // 0. Wait for Docker services
   await waitForService(PGRST_URL);
 
@@ -34,20 +34,29 @@ Deno.test("🌌 Aether E2E Integration Suite", async (t) => {
     try {
       await introspector.connect();
       const schema = await introspector.introspect();
-      
+
       // Basic assertions on introspection result
-      assertExists(schema.tables.find(t => t.name === "users"), "Users table not found");
-      assertExists(schema.tables.find(t => t.name === "posts"), "Posts table not found");
-      assertExists(schema.enums.find(e => e.name === "user_status"), "Enum not found");
+      assertExists(
+        schema.tables.find((t) => t.name === "users"),
+        "Users table not found",
+      );
+      assertExists(
+        schema.tables.find((t) => t.name === "posts"),
+        "Posts table not found",
+      );
+      assertExists(
+        schema.enums.find((e) => e.name === "user_status"),
+        "Enum not found",
+      );
 
       // Generate Types
       const tsCode = generateTypeScript(schema);
       await Deno.writeTextFile(GENERATED_FILE, tsCode);
-      
+
       const fileContent = await Deno.readTextFile(GENERATED_FILE);
       assertEquals(fileContent.includes("export interface Users"), true);
       assertEquals(fileContent.includes("export interface DB"), true);
-      
+
       console.log("   ✅ Generated types successfully.");
     } finally {
       await introspector.close();
@@ -55,16 +64,16 @@ Deno.test("🌌 Aether E2E Integration Suite", async (t) => {
   });
 
   // 2. THE FABRIC: Runtime Operations
-  // Note: In a real app, you would import the generated types. 
+  // Note: In a real app, you would import the generated types.
   // For this test runner, we use generic typing but validate runtime behavior.
-  
+
   const db = createAether<any>({ baseUrl: PGRST_URL });
 
   await t.step("🧵 Fabric: Read (findMany)", async () => {
     const users = await db.public.users.findMany({
-      select: ["username", "status"]
+      select: ["username", "status"],
     });
-    
+
     assertExists(users);
     assertEquals(users.length >= 3, true); // Seed has 3 users
     assertEquals(users[0].username, "alice");
@@ -78,16 +87,16 @@ Deno.test("🌌 Aether E2E Integration Suite", async (t) => {
       author_id: 1,
       title: "Integration Test Post",
       content: "Testing BigInt",
-      price: bigPrice 
+      price: bigPrice,
     });
 
     const posts = await db.public.posts.findMany({
-      where: { title: { $eq: "Integration Test Post" } }
+      where: { title: { $eq: "Integration Test Post" } },
     });
 
     assertEquals(posts.length, 1);
     assertEquals(posts[0].price, bigPrice); // Should return as string, exact match
-    
+
     // Cleanup
     await db.public.posts.delete({ title: "Integration Test Post" });
   });
@@ -96,13 +105,13 @@ Deno.test("🌌 Aether E2E Integration Suite", async (t) => {
     // Reset state just in case
     await db.public.users.update(
       { username: "bob" },
-      { status: "active" }
+      { status: "active" },
     );
 
     // Update
     await db.public.users.update(
       { username: { $eq: "bob" } },
-      { status: "inactive" }
+      { status: "inactive" },
     );
 
     const bob = await db.public.users.findOne({ where: { username: "bob" } });

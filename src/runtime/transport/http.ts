@@ -30,8 +30,10 @@ export class Carrier {
     };
 
     if (options.body) {
-      config.body = JSON.stringify(options.body, (_key, value) =>
-        typeof value === "bigint" ? value.toString() : value);
+      config.body = JSON.stringify(
+        options.body,
+        (_key, value) => typeof value === "bigint" ? value.toString() : value,
+      );
     }
 
     const execute = async () => {

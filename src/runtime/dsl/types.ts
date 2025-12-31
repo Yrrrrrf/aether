@@ -39,7 +39,8 @@ export interface ViewOperations<T = unknown, R = unknown> {
   findOne(query?: QueryOptions<T>): Promise<(T & R) | null>;
 }
 
-export interface TableOperations<T = unknown, R = unknown> extends ViewOperations<T, R> {
+export interface TableOperations<T = unknown, R = unknown>
+  extends ViewOperations<T, R> {
   create(data: Partial<T> | Partial<T>[]): Promise<T[]>;
   update(filter: QueryFilter, data: Partial<T>): Promise<T[]>;
   delete(filter: QueryFilter): Promise<void>;

@@ -92,7 +92,7 @@ function processFilter(
                   // Postgres Array Literal escaping
                   // We escape backslashes first, then quotes
                   // Note: We use the raw value 'v' for escaping logic to ensure
-                  // we don't try to escape already-encoded characters, 
+                  // we don't try to escape already-encoded characters,
                   // but we encode the final result for URL safety.
                   const escaped = v
                     .replace(/\\/g, "\\\\")

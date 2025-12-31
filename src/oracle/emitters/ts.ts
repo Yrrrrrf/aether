@@ -42,7 +42,9 @@ export function generateTypeScript(schema: DatabaseSchema): string {
       const interfaceName = toPascalCase(t.name);
       const relationsName = `${interfaceName}Relations`;
       const wrapper = t.isView ? "ViewOperations" : "TableOperations";
-      lines.push(`    ${t.name}: ${wrapper}<${interfaceName}, ${relationsName}>;`);
+      lines.push(
+        `    ${t.name}: ${wrapper}<${interfaceName}, ${relationsName}>;`,
+      );
     }
     lines.push(`  };`);
   }
