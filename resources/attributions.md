@@ -8,4 +8,4 @@ This file records the attributions for all the assets used in the project.
 
 | URL                                                       | Icon |
 | --------------------------------------------------------- | ---- |
-| [Prism](https://www.flaticon.com/free-icon/prism_3430326) |      |
+| [Dodecahedron](https://www.flaticon.com/free-icon/dodecahedron_3810289) | <img src="./img/dodecahedron.png" width="128"> |

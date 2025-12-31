@@ -1,125 +1,113 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/Yrrrrrf/prism-ts/main/resources/img/prism.png" alt="Prism Icon" width="128" height="128" description="A prism that can take one light source and split it into multiple colors!">
-  <div align="center">prism-ts</div>
+  <img src="https://raw.githubusercontent.com/Yrrrrrf/prism-py/main/resources/img/dodecahedron.png" alt="Aether Icon" width="128" height="128" description="A simple dodecahedron with a yellow glow!">
+  <div align="center">AETHER</div>
 </h1>
 
 <div align="center">
+  <strong>The Type-Safe Data Fabric</strong>
+</div>
 
-[![JSR](https://jsr.io/badges/@yrrrrrf/prism-ts)](https://jsr.io/@yrrrrrf/prism-ts)
-[![JSR score](https://jsr.io/badges/@yrrrrrf/prism-ts/score)](https://jsr.io/@yrrrrrf/prism-ts)
-[![GitHub: Prism-py](https://img.shields.io/badge/GitHub-prism--ts-181717?logo=github)](https://github.com/Yrrrrrf/prism-ts)
+<div align="center">
+
+[![Deno](https://img.shields.io/badge/Deno-2.x-000000?logo=deno&logoColor=white)](https://deno.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://choosealicense.com/licenses/mit/)
+[![PostgREST](https://img.shields.io/badge/Backend-PostgREST-blue)](https://postgrest.org)
 
 </div>
 
 ## Overview
 
-A TypeScript library designed provides full type safety, automatic type
-generation, and a comprehensive set of utilities for interacting with your
-database-driven API.
+**Aether** is a next-generation TypeScript library that projects your PostgreSQL database directly into your frontend code. It acts as a "Phantom" layer—intercepting property access and translating it into efficient [PostgREST](https://postgrest.org/) API calls.
 
-> **Note**: This library is part of the Prism ecosystem, which includes
-> [**prism-py**](https://github.com/Yrrrrrf/prism-py), a Python library that
-> generates APIs from database schemas.
+Unlike traditional ORMs or API clients, Aether requires **zero boilerplate**. It introspects your database to generate strict TypeScript interfaces and Zod schemas, then provides a fluid, type-safe API to query your data as if it were local memory.
 
-## Features
+> **Note:** Aether is the spiritual successor to `prism-ts`, refactored for modern Deno/TypeScript environments and PostgREST backends.
 
-- **🔒 Type-Safe API Client**: Fully typed requests and responses
-- **🔄 Code Generation**: Generate TypeScript interfaces from database schemas
-- **📚 Metadata Explorer**: Explore your API structure programmatically
-- **🔧 CRUD Operations**: Standardized operations for all database tables
-- **🔍 Type Inference**: Leverages TypeScript's type system for excellent IDE
-  support
-- **📝 Query Builder**: Type-safe filter construction for API requests
-- **🧩 Zero Configuration**: Works out of the box with
-  [**prism-py**](https://github.com/Yrrrrrf/prism-py) APIs
+## Key Features
 
-## Installation
+- **🔮 The Oracle**: An intelligent CLI that introspects your PostgreSQL schema and generates strict TypeScript interfaces and Zod validation schemas.
+- **👻 The Phantom**: A lightweight runtime (3KB) that uses ES6 Proxies to convert code like `db.users.findMany(...)` into optimized REST calls.
+- **🗣️ The Dialect**: A powerful Query DSL that translates complex filters (`$or`, `$in`, `$cs`) into PostgREST URL syntax automatically.
+- **🛡️ Type Fidelity**: Automatic handling of PostgreSQL-specific types:
+  - `BigInt` → `string` (safe serialization to prevent JS number overflow).
+  - `Date`/`Timestamp` → ISO 8601 strings.
+  - `JSONB` → Typed interfaces.
+- **⚡ Split-Brain Routing**: Seamlessly handles standard table operations and RPC stored procedure calls via the `_plugins` namespace.
 
-```bash
-# Using Deno
-deno add @jsr/prism-ts
+## Architecture
 
-# Using npm via deno2node
-npm install @jsr/prism-ts
-```
+Aether consists of two distinct parts:
+
+1.  **Dev-Time (The Oracle):** Connects to Port `5432` (Postgres) to read the schema.
+2.  **Runtime (The Fabric):** Connects to Port `3000` (PostgREST) to execute queries.
 
 ## Quick Start
 
-```typescript
-import { BaseClient, PrismTs } from "@jsr/prism-ts";
+### 1. Start the Backend
 
-// Initialize the client pointing to your prism-py API
-const client = new BaseClient("http://localhost:8000");
-const prism = new PrismTs(client);
+Use the provided Docker Compose setup to spin up a Postgres DB and a PostgREST server.
 
-// Initialize and load schema metadata
-await prism.initialize();
-
-// Generate TypeScript types (during development)
-await prism.generateTypes();
-
-// Get type-safe operations for a specific table
-const userOperations = await prism.getTableOperations("public", "users");
-
-// Fetch with filtering, sorting, and pagination
-const activeUsers = await userOperations.findMany({
-	where: { status: "active" },
-	orderBy: { created_at: "desc" },
-	limit: 10,
-	offset: 0,
-});
-
-// Create a new record
-const newUser = await userOperations.create({
-	username: "johndoe",
-	email: "john@example.com",
-	status: "active",
-});
-
-// Update a record
-await userOperations.update(newUser.id, {
-	status: "inactive",
-});
-
-// Delete a record
-await userOperations.delete(newUser.id);
+```bash
+docker-compose up -d
 ```
 
-## Type Generation
+### 2. Generate Types (The Oracle)
 
-prism-ts can automatically generate TypeScript interfaces from your prism-py
-API:
+Introspect the database to generate your `schema.d.ts`.
 
-```typescript
-import { BaseClient, PrismTs } from "@jsr/prism-ts";
-
-const client = new BaseClient("http://localhost:8000");
-const prism = new PrismTs(client);
-
-// Generate all types to a directory
-await prism.generateTypes("./src/types");
-
-// Now you can import these generated types
-import { Product, User } from "./src/types";
+```bash
+deno task generate --url=postgres://aether_user:aether_password@localhost:5432/aether_test --out=./src/schema.d.ts
 ```
 
-## Why prism-ts?
+### 3. Initialize Client (The Fabric)
 
-- **End-to-End Type Safety**: From database to frontend
-- **Zero Boilerplate**: No manual typing of API responses
-- **Automatic Updates**: Types stay in sync with database changes
-- **Developer Experience**: Great IDE integration with auto-completion
-- **Database-First Development**: Build your API around your data model
+Use the generated types to create a type-safe client.
 
-## Integration with prism-py
+```typescript
+import { createAether } from "@yrrrrrf/aether";
+import type { DB } from "./src/schema.d.ts";
 
-prism-ts is designed to work seamlessly with
-[prism-py](https://github.com/Yrrrrrf/prism-py), a Python library that generates
-APIs from database schemas. Together, they provide a complete solution for
-rapid, type-safe application development:
+// Connect to PostgREST (default port 3000)
+const db = createAether<DB>({ baseUrl: "http://localhost:3000" });
 
-1. Define your database schema
-2. Generate an API with prism-py
-3. Connect to the API with prism-ts
-4. Build your frontend with full type safety
+// 1. Find active users older than 21
+const users = await db.public.users.findMany({
+  where: { 
+    age: { $gt: 21 }, 
+    status: "active" 
+  },
+  select: ["id", "username"] 
+});
+
+// 2. Create a new post (BigInt safe!)
+await db.public.posts.create({
+  title: "Aether is Fast",
+  views: "9007199254740995" // Safe BigInt handling
+});
+```
+
+## The Dialect DSL
+
+Aether uses a MongoDB-like syntax that maps to PostgREST operators:
+
+| Aether DSL | PostgREST | SQL Equivalent |
+| :--- | :--- | :--- |
+| `{ age: { $gt: 10 } }` | `age=gt.10` | `WHERE age > 10` |
+| `{ tags: { $cs: ["news"] } }` | `tags=cs.{news}` | `WHERE tags @> '{news}'` |
+| `{ id: { $in: [1, 2] } }` | `id=in.(1,2)` | `WHERE id IN (1, 2)` |
+| `{ $or: [{ a: 1 }, { b: 2 }] }` | `or=(a.eq.1,b.eq.2)` | `WHERE a = 1 OR b = 2` |
+
+## Project Structure
+
+```
+└── aether/
+    ├── src/
+    │   ├── oracle/    # Introspection & Codegen (Dev-time)
+    │   └── runtime/   # Client Fabric & Proxy (Runtime)
+    └── tests/         # Integration & Unit tests
+```
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
