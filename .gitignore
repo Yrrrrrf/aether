@@ -2,7 +2,9 @@
 .*
 !.gitignore
 
-# TS-generated files
-
 # lock files
 **/**.lock
+
+# TS-generated files
+# ignore the generated schema file (if it exists)
+**/generated_schema.d.ts

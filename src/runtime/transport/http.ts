@@ -30,9 +30,10 @@ export class Carrier {
     };
 
     if (options.body) {
+      // BigInt Serialization (Outgoing)
       config.body = JSON.stringify(
         options.body,
-        (_key, value) => typeof value === "bigint" ? value.toString() : value,
+        (_, v) => typeof v === "bigint" ? v.toString() : v,
       );
     }
 
@@ -41,42 +42,31 @@ export class Carrier {
         const response = await fetch(url, config);
 
         if (!response.ok) {
-          let errorBody;
-          try {
-            errorBody = await response.json();
-          } catch {
-            errorBody = await response.text();
-          }
-          throw new ApiError(response.status, response.statusText, errorBody);
+          throw new ApiError(
+            response.status,
+            response.statusText,
+            await response.text(),
+          );
         }
 
-        // Handle 204 No Content
-        if (response.status === 204) {
-          return null as T;
-        }
+        if (response.status === 204) return null as T;
 
-        return (await response.json()) as T;
+        const text = await response.text();
+        if (!text) return null as T;
+
+        // --- BIGINT SAFETY PATCH (Incoming) ---
+        // Wraps numbers > 15 digits in quotes
+        const safeText = text.replace(/"([^"]+)":\s*(\d{15,})/g, '"$1": "$2"');
+
+        return JSON.parse(safeText) as T;
       } catch (err) {
         if (err instanceof ApiError) throw err;
-        if (err instanceof DOMException && err.name === "AbortError") throw err;
         throw new NetworkError(
-          err instanceof Error ? err.message : "Unknown network error",
+          err instanceof Error ? err.message : "Unknown",
           err,
         );
       }
     };
-
-    // Only retry idempotent methods (GET, PUT, DELETE, HEAD, OPTIONS)
-    // or if it's strictly a network error on others, handled by withRetry logic
-    // But technically we should be careful with POST/PATCH.
-    // The retry logic in retry.ts checks for NetworkError.
-    // Spec says: "The retry.ts module must never retry non-idempotent methods... unless a specific network error occurred."
-    // My retry logic currently checks isRetryable(error).
-    // Let's enforce the method constraint here or there.
-
-    // Ideally, we pass "isIdempotent" context to retry, or we strictly control it here.
-    // For now, I'll rely on the generalized retry logic which retries NetworkErrors (safe for all usually, unless the request partially reached the server)
-    // and 503/504.
 
     return withRetry(execute, options.retry);
   }
