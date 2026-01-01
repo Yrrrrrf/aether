@@ -13,8 +13,8 @@ export function createAether<DB>(config: AetherConfig): DB {
   const carrier = new Carrier(config.baseUrl, config.headers);
 
   return createRecursiveProxy(async (path, args) => {
+    // Split-Brain Routing: Plugins
     if (path[0] === "_plugins") {
-      // ... plugin logic ...
       const namespace = path[1];
       const fnName = path[2];
       const payload = args[0];
@@ -38,12 +38,11 @@ export function createAether<DB>(config: AetherConfig): DB {
       }
       case "findOne": {
         const options = args[0] as QueryOptions | undefined;
-        // Force limit 1 to verify uniqueness optimization on server if supported
+        // Force limit 1
         const url = buildUrl(schema, table, { ...options, limit: 1 });
-
         const result = await carrier.request<any[]>(url, { method: "GET" });
 
-        // UNWRAP LOGIC
+        // UNWRAP: Always return single object or null
         if (Array.isArray(result)) {
           return result.length > 0 ? result[0] : null;
         }
@@ -51,10 +50,17 @@ export function createAether<DB>(config: AetherConfig): DB {
       }
       case "create": {
         const data = args[0];
-        // pREST requires database/schema/table in URL generally, but here we assume strict mapping
-        // based on the client BaseURL.
+        // pREST strict path mapping
         const url = `/${schema}/${table}`;
-        return carrier.request(url, { method: "POST", body: data });
+        const result = await carrier.request(url, {
+          method: "POST",
+          body: data,
+        });
+
+        // NORMALIZE: Ensure we always return an Array T[]
+        // If pREST returns a single object {id:1}, we wrap it in [{id:1}]
+        if (result === null) return [];
+        return Array.isArray(result) ? result : [result];
       }
       case "update": {
         const filter = args[0] as QueryFilter;
@@ -64,7 +70,14 @@ export function createAether<DB>(config: AetherConfig): DB {
         }
 
         const url = buildUrl(schema, table, { where: filter });
-        return carrier.request(url, { method: "PATCH", body: data });
+        const result = await carrier.request(url, {
+          method: "PATCH",
+          body: data,
+        });
+
+        // NORMALIZE: Ensure Array T[]
+        if (result === null) return [];
+        return Array.isArray(result) ? result : [result];
       }
       case "delete": {
         const filter = args[0] as QueryFilter;
