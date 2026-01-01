@@ -1,6 +1,7 @@
 {
   "name": "@yrrrrrf/aether",
   "version": "0.1.0",
+  "license": "MIT",
   "exports": {
     ".": "./src/runtime/mod.ts",
     "./generator": "./src/oracle/mod.ts"
