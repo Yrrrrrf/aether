@@ -145,13 +145,32 @@ Deno.test("Oracle Emitters - Naming and Deduplication Snapshot", () => {
     "Missing PrivateUsersSchema object",
   );
   assertEquals(
-    zodCode.includes("users: PublicUsersSchema as ValidationStrategy,"),
+    zodCode.includes(
+      '"public.users": PublicUsersSchema as ValidationStrategy,',
+    ),
     true,
     "Missing public table validators mapping",
   );
   assertEquals(
-    zodCode.includes("users: PrivateUsersSchema as ValidationStrategy,"),
+    zodCode.includes(
+      '"private.users": PrivateUsersSchema as ValidationStrategy,',
+    ),
     true,
     "Missing private view validators mapping",
+  );
+  assertEquals(
+    zodCode.includes("export const PublicUsersInsertSchema = z.object({"),
+    true,
+    "Missing PublicUsersInsertSchema object",
+  );
+  assertEquals(
+    zodCode.includes("export const PrivateUsersInsertSchema = z.object({"),
+    true,
+    "Missing PrivateUsersInsertSchema object",
+  );
+  assertEquals(
+    zodCode.includes("export function getValidator("),
+    true,
+    "Missing getValidator helper",
   );
 });

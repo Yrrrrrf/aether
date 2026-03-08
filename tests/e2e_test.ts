@@ -8,9 +8,9 @@ withTestEnv("🔮 Oracle: Introspection & Codegen", async ({ generate }) => {
   const content = await Deno.readTextFile(TEST_SCHEMA_FILE);
   assertExists(content, "File should exist");
   assertEquals(
-    content.includes("export interface Users"),
+    content.includes("export interface PublicUsers"),
     true,
-    "Should have Users interface",
+    "Should have PublicUsers interface",
   );
 });
 

@@ -1,4 +1,5 @@
-import type { DatabaseSchema, Table } from "../ast/types.ts";
+import type { Column, DatabaseSchema, Table } from "../ast/types.ts";
+import { toInterfaceName, toPascalCase, toSchemaName } from "../utils.ts";
 
 export function generateZod(
   schema: DatabaseSchema,
@@ -36,92 +37,103 @@ export function generateZod(
   // Validators Map
   lines.push(`export const validators: Record<string, ValidationStrategy> = {`);
   for (const table of schema.tables) {
-    const schemaName = toPascalCase(table.schema + "_" + table.name) + "Schema";
-    lines.push(`  ${table.name}: ${schemaName} as ValidationStrategy,`);
+    const schemaName = toSchemaName(table.schema, table.name);
+    lines.push(
+      `  "${table.schema}.${table.name}": ${schemaName} as ValidationStrategy,`,
+    );
   }
   lines.push(`};`);
+  lines.push(``);
+  lines.push(
+    `export function getValidator(schema: string, table: string): ValidationStrategy | undefined {`,
+  );
+  lines.push(`  return validators[schema + "." + table];`);
+  lines.push(`}`);
 
   return lines.join("\n");
 }
 
 function generateTableZod(table: Table, schema: DatabaseSchema): string[] {
   const lines: string[] = [];
-  const schemaName = toPascalCase(table.schema + "_" + table.name) + "Schema";
+  const schemaName = toSchemaName(table.schema, table.name);
+  const insertSchemaName = toInterfaceName(table.schema, table.name) +
+    "InsertSchema";
 
+  // 1. Select Schema
   lines.push(`export const ${schemaName} = z.object({`);
-
   for (const col of table.columns) {
-    let zodType = "z.unknown()";
+    let zodType = getBaseZodType(col, schema, table);
+    if (col.isNullable) zodType += ".nullable()";
+    lines.push(`  ${col.name}: ${zodType},`);
+  }
+  lines.push(`});`);
+  lines.push(``);
 
-    // Check Enum
-    const foundEnum = schema.enums.find((e) =>
-      e.name === col.udtName && e.schema === table.schema
-    );
-    if (foundEnum) {
-      zodType = toPascalCase(foundEnum.name) + "Schema";
-    } else {
-      // Map basic types
-      switch (col.dataType) {
-        case "boolean":
-          zodType = "z.boolean()";
-          break;
-        case "integer":
-        case "smallint":
-        case "real":
-        case "double precision":
-        case "numeric":
-          zodType = "z.number()";
-          break;
-        case "bigint":
-          zodType = "z.string()";
-          break;
-        case "text":
-        case "character varying":
-        case "character":
-        case "uuid":
-        case "inet":
-        case "cidr":
-        case "macaddr":
-          zodType = "z.string()";
-          break;
-        case "timestamp with time zone":
-        case "timestamp without time zone":
-        case "date":
-        case "time without time zone":
-          // pREST returns strings for dates usually
-          zodType = "z.string()";
-          // Optionally: z.string().datetime() or similar if strict
-          break;
-        case "json":
-        case "jsonb":
-          zodType = "z.any()";
-          break; // Zod doesn't have simple 'json', usually 'any' or recursive
-        case "ARRAY":
-          zodType = "z.array(z.unknown())";
-          break; // Naive array
-      }
-    }
+  // 2. Insert Schema
+  lines.push(`export const ${insertSchemaName} = z.object({`);
+  for (const col of table.columns) {
+    let zodType = getBaseZodType(col, schema, table);
+    if (col.isNullable) zodType += ".nullable()";
 
-    if (col.isNullable) {
-      zodType += ".nullable()";
-    } else if (!col.hasDefault) {
-      // It's required.
+    if (col.hasDefault || col.isNullable) {
+      zodType += ".optional()";
     }
-    // If it has default, in Zod for input validation we might make it optional,
-    // but here we are describing the SHAPE of the row in DB, so it's technically present.
-    // However, usually these schemas are used for validation.
-    // For Aether v2.1 MVP, we map Strict DB Shape.
 
     lines.push(`  ${col.name}: ${zodType},`);
   }
-
   lines.push(`});`);
+
   return lines;
 }
 
-function toPascalCase(str: string): string {
-  return str.replace(/_(\w)/g, (_, c) => c.toUpperCase()).replace(
-    /^[a-z]/,
-    (c) => c.toUpperCase(),
+function getBaseZodType(
+  col: Column,
+  schema: DatabaseSchema,
+  table: Table,
+): string {
+  let zodType = "z.unknown()";
+
+  // Check Enum
+  const foundEnum = schema.enums.find((e) =>
+    e.name === col.udtName && e.schema === table.schema
   );
+  if (foundEnum) {
+    return toPascalCase(foundEnum.name) + "Schema";
+  }
+
+  // Map basic types
+  switch (col.dataType) {
+    case "boolean":
+      zodType = "z.boolean()";
+      break;
+    case "integer":
+    case "smallint":
+    case "real":
+    case "double precision":
+    case "numeric":
+      zodType = "z.number()";
+      break;
+    case "bigint":
+    case "text":
+    case "character varying":
+    case "character":
+    case "uuid":
+    case "inet":
+    case "cidr":
+    case "macaddr":
+    case "timestamp with time zone":
+    case "timestamp without time zone":
+    case "date":
+    case "time without time zone":
+      zodType = "z.string()";
+      break;
+    case "json":
+    case "jsonb":
+      zodType = "z.any()";
+      break;
+    case "ARRAY":
+      zodType = "z.array(z.unknown())";
+      break;
+  }
+  return zodType;
 }

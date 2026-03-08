@@ -6,10 +6,12 @@ import { generateZod } from "./emitters/zod.ts";
 async function main() {
   const flags = parseArgs(Deno.args, {
     string: ["url", "out", "zod-out", "mode", "schema", "import-from"],
+    boolean: ["include-comments"],
     default: {
       out: "./src/aether.d.ts",
       mode: "standard",
       "import-from": "@yrrrrrf/aether",
+      "include-comments": true,
     },
   });
 
@@ -34,7 +36,11 @@ async function main() {
     );
 
     console.log("📜 Oracle: Generating types...");
-    const tsCode = generateTypeScript(schema, flags["import-from"]);
+    const tsCode = generateTypeScript(
+      schema,
+      flags["import-from"],
+      flags["include-comments"],
+    );
 
     console.log(`💾 Oracle: Writing to ${flags.out}...`);
     await Deno.writeTextFile(flags.out, tsCode);

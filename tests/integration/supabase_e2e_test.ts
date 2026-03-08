@@ -10,9 +10,9 @@ withSupabaseEnv(
     const content = await Deno.readTextFile(TEST_SCHEMA_FILE);
     assertExists(content, "File should exist");
     assertEquals(
-      content.includes("export interface AetherUsers"),
+      content.includes("export interface PublicAetherUsers"),
       true,
-      "Should have AetherUsers interface generated from DB",
+      "Should have PublicAetherUsers interface generated from DB",
     );
     // Ensure we filtered out the Supabase internal schema Auth
     assertEquals(

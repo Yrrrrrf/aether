@@ -1,9 +1,11 @@
 import type { DatabaseSchema, Table } from "../ast/types.ts";
 import { mapPostgresTypeToTs } from "../ast/mapper.ts";
+import { toInterfaceName, toPascalCase } from "../utils.ts";
 
 export function generateTypeScript(
   schema: DatabaseSchema,
   importFrom = "@yrrrrrf/aether",
+  includeComments = true,
 ): string {
   const lines: string[] = [];
 
@@ -30,7 +32,7 @@ export function generateTypeScript(
 
   // Tables
   for (const table of schema.tables) {
-    lines.push(...generateTable(table, schema));
+    lines.push(...generateTable(table, schema, includeComments));
     lines.push(...generateRelations(table, schema));
     lines.push(``);
   }
@@ -43,7 +45,7 @@ export function generateTypeScript(
     lines.push(`  ${s}: {`);
     const schemaTables = schema.tables.filter((t) => t.schema === s);
     for (const t of schemaTables) {
-      const interfaceName = toPascalCase(t.schema + "_" + t.name);
+      const interfaceName = toInterfaceName(t.schema, t.name);
       const relationsName = `${interfaceName}Relations`;
       const wrapper = t.isView ? "ViewOperations" : "TableOperations";
       lines.push(
@@ -59,18 +61,17 @@ export function generateTypeScript(
 
 function generateRelations(table: Table, _schema: DatabaseSchema): string[] {
   const lines: string[] = [];
-  const interfaceName = `${
-    toPascalCase(table.schema + "_" + table.name)
-  }Relations`;
+  const interfaceName = `${toInterfaceName(table.schema, table.name)}Relations`;
 
   lines.push(`export interface ${interfaceName} {`);
   const emittedRels = new Set<string>();
 
   for (const fk of table.foreignKeys) {
-    if (emittedRels.has(fk.targetTable)) continue;
-    emittedRels.add(fk.targetTable);
+    const relKey = fk.targetSchema + "." + fk.targetTable;
+    if (emittedRels.has(relKey)) continue;
+    emittedRels.add(relKey);
 
-    const targetName = toPascalCase(fk.targetSchema + "_" + fk.targetTable);
+    const targetName = toInterfaceName(fk.targetSchema, fk.targetTable);
     // PostgREST convention: use the table name for the relationship
     lines.push(`  ${fk.targetTable}?: ${targetName};`);
   }
@@ -79,9 +80,13 @@ function generateRelations(table: Table, _schema: DatabaseSchema): string[] {
   return lines;
 }
 
-function generateTable(table: Table, schema: DatabaseSchema): string[] {
+function generateTable(
+  table: Table,
+  schema: DatabaseSchema,
+  includeComments: boolean,
+): string[] {
   const lines: string[] = [];
-  const interfaceName = toPascalCase(table.schema + "_" + table.name);
+  const interfaceName = toInterfaceName(table.schema, table.name);
 
   lines.push(`export interface ${interfaceName} {`);
 
@@ -112,6 +117,10 @@ function generateTable(table: Table, schema: DatabaseSchema): string[] {
       tsType = "Json";
     }
 
+    if (includeComments && col.comment) {
+      lines.push(`  /** ${col.comment} */`);
+    }
+
     const optionalMark = col.isNullable ? "?" : "";
     const nullType = col.isNullable ? " | null" : "";
 
@@ -121,11 +130,4 @@ function generateTable(table: Table, schema: DatabaseSchema): string[] {
   lines.push(`}`);
 
   return lines;
-}
-
-function toPascalCase(str: string): string {
-  return str.replace(/_(\w)/g, (_, c) => c.toUpperCase()).replace(
-    /^[a-z]/,
-    (c) => c.toUpperCase(),
-  );
 }

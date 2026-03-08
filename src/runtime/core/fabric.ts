@@ -27,8 +27,7 @@ export interface AetherConfig {
 }
 
 export function isPostgrestDialect(config: AetherConfig): boolean {
-  return config.dialect === "postgrest" || config.dialect === "supabase" ||
-    !!config.apiKey;
+  return config.dialect === "postgrest" || config.dialect === "supabase";
 }
 
 export function resolveWriteHeaders(
