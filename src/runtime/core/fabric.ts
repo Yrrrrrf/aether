@@ -4,7 +4,6 @@ import { buildPostgrestUrl, buildUrl } from "../dsl/dialect.ts";
 import type { QueryFilter, QueryOptions } from "../dsl/types.ts";
 import { ValidationError } from "../transport/errors.ts";
 import type { AuthProvider } from "../auth/types.ts";
-import { tokenAdapter } from "../auth/adapters.ts";
 import type { ValidationStrategy } from "../validation/types.ts";
 
 export interface AetherConfig {
@@ -13,13 +12,7 @@ export interface AetherConfig {
   dialect?: "prest" | "postgrest" | "supabase";
   apiKey?: string;
 
-  /** @deprecated use `auth` instead */
-  getAccessToken?: () => string | null | Promise<string | null>;
-
   auth?: AuthProvider;
-
-  /** @deprecated use `validators` instead */
-  validate?: ValidationStrategy;
 
   // deno-lint-ignore no-explicit-any
   validators?: Record<string, ValidationStrategy<any>>;
@@ -45,10 +38,6 @@ export function resolveWriteHeaders(
 
 export function createAether<DB>(rawConfig: AetherConfig): DB {
   const config = { ...rawConfig };
-  // v1 compatibility shim
-  if (config.getAccessToken && !config.auth) {
-    config.auth = tokenAdapter(config.getAccessToken);
-  }
 
   const isPostgrest = isPostgrestDialect(config);
   const request = buildTransport(config);
@@ -191,8 +180,7 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
 
     // deno-lint-ignore no-explicit-any
     const options = args[0] as any;
-    const validator = options?.validate ??
-      (config.validators ? config.validators[table] : config.validate);
+    const validator = options?.validate ?? config.validators?.[table];
     result = applyValidation(result, validator);
 
     return result;

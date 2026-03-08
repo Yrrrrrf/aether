@@ -114,7 +114,7 @@ export function withSupabaseEnv(
         baseUrl: SUPABASE_API,
         dialect: "supabase",
         apiKey: SUPABASE_ANON_KEY,
-        getAccessToken: () => null, // Just anon access
+        auth: { getAccessToken: () => null }, // Just anon access
       });
 
       // 3. Run User Test

@@ -102,7 +102,9 @@ const db = createAether<DB>({
   baseUrl: "http://localhost:54321/rest/v1",
   dialect: "supabase", // Enables "Prefer" headers and PostgREST serialization
   apiKey: "eyJhbGci...", // Supabase Anon Key
-  getAccessToken: () => session?.access_token ?? null, // Fresh JWT on every request
+  auth: {
+    getAccessToken: () => session?.access_token ?? null, // Fresh JWT on every request
+  },
 });
 
 // 1. Find active users older than 21, fetching exact count and embedding their posts

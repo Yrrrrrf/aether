@@ -9,14 +9,3 @@ export function apiKeyAdapter(key: string): AuthProvider {
     getAccessToken: () => key,
   };
 }
-
-/**
- * Compatibility shim mapping v1 'getAccessToken' pattern to the new AuthProvider interface.
- */
-export function tokenAdapter(
-  fn: () => string | null | Promise<string | null>,
-): AuthProvider {
-  return {
-    getAccessToken: fn,
-  };
-}

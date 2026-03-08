@@ -2,7 +2,7 @@ export { type AetherConfig, createAether } from "./core/fabric.ts";
 export { createAetherPool, type Pool } from "./core/pool.ts";
 
 export type { AuthProvider } from "./auth/types.ts";
-export { apiKeyAdapter, tokenAdapter } from "./auth/adapters.ts";
+export { apiKeyAdapter } from "./auth/adapters.ts";
 
 export {
   type QueryFilter,

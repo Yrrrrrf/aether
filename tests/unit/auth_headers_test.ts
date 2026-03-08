@@ -2,7 +2,6 @@ import { assertEquals, assertFalse } from "@std/assert";
 import { resolveClientHeaders } from "../../src/runtime/transport/client.ts";
 import { resolveWriteHeaders } from "../../src/runtime/core/fabric.ts";
 import type { AetherConfig } from "../../src/runtime/core/fabric.ts";
-import { tokenAdapter } from "../../src/runtime/auth/adapters.ts";
 
 Deno.test("Auth Headers - API Key Only", async () => {
   const config: AetherConfig = {
@@ -20,7 +19,7 @@ Deno.test("Auth Headers - API Key + JWT", async () => {
     baseUrl: "http://localhost:3000",
     dialect: "supabase",
     apiKey: "test-key",
-    auth: tokenAdapter(() => "jwt-token"),
+    auth: { getAccessToken: () => "jwt-token" },
   };
   const headers = await resolveClientHeaders(config);
   assertEquals(headers["apikey"], "test-key");
@@ -32,7 +31,7 @@ Deno.test("Auth Headers - JWT is Null", async () => {
     baseUrl: "http://localhost:3000",
     dialect: "supabase",
     apiKey: "test-key",
-    auth: tokenAdapter(() => null),
+    auth: { getAccessToken: () => null },
   };
   const headers = await resolveClientHeaders(config);
   assertEquals(headers["apikey"], "test-key");
