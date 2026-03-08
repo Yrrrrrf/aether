@@ -80,9 +80,21 @@ export class PostgresIntrospector {
       WHERE table_schema NOT IN (${schemaExclusions})
     `);
 
+    const tablesMap = new Map<string, typeof tablesResult.rows[0]>();
+    for (const row of tablesResult.rows) {
+      const key = `${row.schema}.${row.name}`;
+      if (tablesMap.has(key)) {
+        if (row.kind === "VIEW") {
+          tablesMap.set(key, row);
+        }
+      } else {
+        tablesMap.set(key, row);
+      }
+    }
+
     const tables: Table[] = [];
 
-    for (const row of tablesResult.rows) {
+    for (const row of tablesMap.values()) {
       const isView = row.kind === "VIEW";
       const columns = await this.getColumns(row.schema, row.name);
       const primaryKeys = await this.getPrimaryKeys(row.schema, row.name);

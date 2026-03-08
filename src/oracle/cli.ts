@@ -5,8 +5,12 @@ import { generateZod } from "./emitters/zod.ts";
 
 async function main() {
   const flags = parseArgs(Deno.args, {
-    string: ["url", "out", "zod-out", "mode", "schema"],
-    default: { out: "./src/aether.d.ts", mode: "standard" },
+    string: ["url", "out", "zod-out", "mode", "schema", "import-from"],
+    default: {
+      out: "./src/aether.d.ts",
+      mode: "standard",
+      "import-from": "@yrrrrrf/aether",
+    },
   });
 
   if (!flags.url) {
@@ -30,14 +34,14 @@ async function main() {
     );
 
     console.log("📜 Oracle: Generating types...");
-    const tsCode = generateTypeScript(schema);
+    const tsCode = generateTypeScript(schema, flags["import-from"]);
 
     console.log(`💾 Oracle: Writing to ${flags.out}...`);
     await Deno.writeTextFile(flags.out, tsCode);
 
     if (flags["zod-out"]) {
       console.log("🛡️  Oracle: Generating Zod schemas...");
-      const zodCode = generateZod(schema);
+      const zodCode = generateZod(schema, flags["import-from"]);
       console.log(`💾 Oracle: Writing Zod schemas to ${flags["zod-out"]}...`);
       await Deno.writeTextFile(flags["zod-out"], zodCode);
     }
