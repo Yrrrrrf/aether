@@ -67,6 +67,9 @@ export function buildTransport(config: AetherConfig) {
         const text = await response.text();
         if (!text) return null;
 
+        // Safe BigInt Parsing: Replaces unquoted large numbers (>15 digits) into strings to prevent precision loss.
+        // It strictly avoids false-positives on string variables (like phone numbers) by enforcing no quote marks after the colon.
+        // E.g. "id": 1234567890123456789 -> "id": "1234567890123456789"
         const safeText = text.replace(/"([^"]+)":\s*(\d{15,})/g, '"$1": "$2"');
         return JSON.parse(safeText);
       },
@@ -74,28 +77,70 @@ export function buildTransport(config: AetherConfig) {
   });
 
   return async <T>(path: string, options: FetchOptions = {}): Promise<T> => {
-    try {
-      // We pass the path; baseUrl is handled by up-fetch
-      // options body will be auto-serialized
-      // deno-lint-ignore no-explicit-any
-      return (await upFetch(path, options as any)) as T;
-    } catch (err) {
-      // deno-lint-ignore no-explicit-any
-      const error = err as any;
-      if (error instanceof ResponseError) {
-        throw new ApiError(
-          error.response.status,
-          error.response.statusText,
-          error.data ?? await error.response.text().catch(() => ""),
+    let attempt = 0;
+    while (true) {
+      try {
+        // We pass the path; baseUrl is handled by up-fetch
+        // options body will be auto-serialized
+        // deno-lint-ignore no-explicit-any
+        return (await upFetch(path, options as any)) as T;
+      } catch (err) {
+        // deno-lint-ignore no-explicit-any
+        const error = err as any;
+
+        // Handle 401 token refresh proactively
+        if (
+          error instanceof ResponseError &&
+          error.response.status === 401 &&
+          config.auth?.onTokenRefresh &&
+          attempt === 0
+        ) {
+          attempt++;
+          try {
+            const refreshPromise = new Promise<void>((resolve, reject) => {
+              try {
+                const res = config.auth!.onTokenRefresh!(() => resolve());
+                if (res instanceof Promise) {
+                  res.then(resolve).catch(reject);
+                }
+              } catch (e) {
+                reject(e);
+              }
+            });
+            const timeoutPromise = new Promise<void>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Token refresh timed out")),
+                10000,
+              )
+            );
+            await Promise.race([refreshPromise, timeoutPromise]);
+            // Retry the request loop by continuing
+            continue;
+          } catch (_refreshErr) {
+            // Throw original 401 if refresh fails or times out
+            throw new ApiError(
+              error.response.status,
+              error.response.statusText,
+              error.data ?? await error.response.text().catch(() => ""),
+            );
+          }
+        }
+
+        if (error instanceof ResponseError) {
+          throw new ApiError(
+            error.response.status,
+            error.response.statusText,
+            error.data ?? await error.response.text().catch(() => ""),
+          );
+        }
+        if (error instanceof ApiError || error instanceof NetworkError) {
+          throw error;
+        }
+        throw new NetworkError(
+          error instanceof Error ? error.message : "Unknown",
+          error,
         );
       }
-      if (error instanceof ApiError || error instanceof NetworkError) {
-        throw error;
-      }
-      throw new NetworkError(
-        error instanceof Error ? error.message : "Unknown",
-        error,
-      );
     }
   };
 }

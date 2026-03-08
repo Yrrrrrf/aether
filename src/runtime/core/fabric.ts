@@ -17,7 +17,12 @@ export interface AetherConfig {
   getAccessToken?: () => string | null | Promise<string | null>;
 
   auth?: AuthProvider;
+
+  /** @deprecated use `validators` instead */
   validate?: ValidationStrategy;
+
+  // deno-lint-ignore no-explicit-any
+  validators?: Record<string, ValidationStrategy<any>>;
   schema?: string;
 }
 
@@ -100,7 +105,6 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
           ? buildPostgrestUrl(table, options)
           : buildUrl(schema, table, options);
         result = await request(url, { method: "GET" });
-        if (options?.validate) result = options.validate.parse(result);
         break;
       }
       case "findOne": {
@@ -116,9 +120,6 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
           result = list.length > 0 ? list[0] : null;
         } else {
           result = list;
-        }
-        if (result && options?.validate) {
-          result = options.validate.parse(result);
         }
         break;
       }
@@ -181,14 +182,19 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
         throw new Error(`Unknown method: ${method}`);
     }
 
-    // Global validation
-    if (config.validate && result !== null) {
-      if (Array.isArray(result)) {
-        result = result.map((item) => config.validate!.parse(item));
-      } else {
-        result = config.validate.parse(result);
-      }
-    }
+    // Validation Application
+    // deno-lint-ignore no-explicit-any
+    const applyValidation = (data: any, strategy?: ValidationStrategy) => {
+      if (!strategy || data === null) return data;
+      if (Array.isArray(data)) return data.map((item) => strategy.parse(item));
+      return strategy.parse(data);
+    };
+
+    // deno-lint-ignore no-explicit-any
+    const options = args[0] as any;
+    const validator = options?.validate ??
+      (config.validators ? config.validators[table] : config.validate);
+    result = applyValidation(result, validator);
 
     return result;
   }) as DB;

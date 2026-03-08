@@ -42,9 +42,14 @@ export interface QueryOptions<T = unknown> {
   embed?: Record<string, QueryOptions | true>;
   count?: "exact" | "planned" | "estimated";
   textSearch?: { column: string; query: string; config?: string };
-  validate?: ValidationStrategy;
+  validate?: ValidationStrategy<T>;
 }
 
+/**
+ * Evaluates embedded relationship nodes conditionally up to 1 level deep.
+ * Deeply nested recursive relations fall back to Partial<R> bounds to preserve
+ * Type stability and mitigate infinite compiler inferences.
+ */
 export type WithEmbed<T, R, O> = O extends { embed: infer E }
   // deno-lint-ignore no-explicit-any
   ? E extends Record<string, any> ?

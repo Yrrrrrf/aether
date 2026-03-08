@@ -10,6 +10,11 @@ export type Pool<T> = T & {
   setAuthProvider(auth: AuthProvider): void;
 };
 
+/**
+ * createAetherPool manages multiple isolated database connections.
+ * This pool acts strictly as a static organization registry without extending
+ * into shared interceptors, routing, or lifecycle bounds globally.
+ */
 export function createAetherPool<T extends Record<string, unknown>>(
   configs: Record<keyof T, AetherConfig>,
 ): Pool<T> {
