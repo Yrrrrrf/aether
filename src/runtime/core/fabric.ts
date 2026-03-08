@@ -77,7 +77,7 @@ export function createAether<DB>(config: AetherConfig): DB {
         const url = isPostgrest
           ? buildPostgrestUrl(table, { ...options, limit: 1 })
           : buildUrl(schema, table, { ...options, limit: 1 });
-        const result = await carrier.request<any[]>(url, { method: "GET" });
+        const result = await carrier.request<unknown[]>(url, { method: "GET" });
 
         // UNWRAP: Always return single object or null
         if (Array.isArray(result)) {

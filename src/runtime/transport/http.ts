@@ -21,7 +21,7 @@ export class Carrier {
       : () => globalHeaders;
   }
 
-  async request<T>(path: string, options: FetchOptions = {}): Promise<T> {
+  request<T>(path: string, options: FetchOptions = {}): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers = {
       "Content-Type": "application/json",

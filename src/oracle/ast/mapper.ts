@@ -1,7 +1,7 @@
 export function mapPostgresTypeToTs(
   dataType: string,
   udtName: string,
-  enums: Set<string>, // Set of enum names (schema.name)
+  _enums: Set<string>, // Set of enum names (schema.name)
 ): string {
   // Check if it's an array
   if (dataType === "ARRAY") {

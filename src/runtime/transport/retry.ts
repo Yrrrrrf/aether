@@ -1,4 +1,4 @@
-import { AetherError, ApiError, NetworkError } from "./errors.ts";
+import { ApiError, NetworkError } from "./errors.ts";
 
 export interface RetryOptions {
   maxRetries?: number;

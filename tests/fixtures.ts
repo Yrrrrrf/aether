@@ -3,6 +3,14 @@ import { createAether } from "../src/runtime/mod.ts";
 import { PostgresIntrospector } from "../src/oracle/mod.ts";
 import { generateTypeScript } from "../src/oracle/emitters/ts.ts";
 
+function safeGetEnv(key: string): string | undefined {
+  try {
+    return Deno.env.get(key);
+  } catch {
+    return undefined;
+  }
+}
+
 // Config
 const DB_CONN =
   "postgres://chimera_admin:secure_password@localhost:5432/chimera";
@@ -15,6 +23,7 @@ export const TEST_SCHEMA_FILE = "./tests/generated_schema.d.ts";
  * SetupContext: Passed to every test so they have what they need
  */
 export interface TestContext {
+  // deno-lint-ignore no-explicit-any
   db: any; // In real usage, this would be <DB> generic
   seed: () => Promise<void>;
   generate: () => Promise<void>;
@@ -101,19 +110,20 @@ async function generateTypes() {
  * The Main Test Wrapper
  * Handles setup/teardown automatically around your test function
  */
-export async function withTestEnv(
+export function withTestEnv(
   name: string,
   fn: (ctx: TestContext) => Promise<void>,
 ) {
   Deno.test({
     name,
-    ignore: Deno.env.get("TEST_PREST") !== "1",
+    ignore: safeGetEnv("TEST_PREST") !== "1",
     fn: async () => {
       // 1. Setup
       await waitForService();
       await seedDatabase();
 
       // 2. Create Client
+      // deno-lint-ignore no-explicit-any
       const db = createAether<any>({ baseUrl: PGRST_API });
 
       // 3. Run User Test

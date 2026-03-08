@@ -25,7 +25,7 @@ export interface QueryFilter {
   [key: string]: unknown | Record<string, unknown> | QueryFilter[];
 }
 
-export interface QueryOptions<T = any> {
+export interface QueryOptions<T = unknown> {
   select?: string[];
   where?: QueryFilter;
   order?:

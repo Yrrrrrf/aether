@@ -18,6 +18,7 @@ const API_URL = `http://${HOST}:${PORT}/${DB_NAME}`;
 
 // --- 2. Initialization ---
 // We use <any> here, but after running the Oracle, you would use <DB>
+// deno-lint-ignore no-explicit-any
 const db = createAether<any>({ baseUrl: API_URL });
 
 async function main() {

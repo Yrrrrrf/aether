@@ -10,6 +10,7 @@ async function main() {
 
   // 2. Initialize Client
   // In a real app, you would pass the generated <DB> generic here
+  // deno-lint-ignore no-explicit-any
   const db = createAether<any>({ baseUrl: API_URL });
 
   try {
