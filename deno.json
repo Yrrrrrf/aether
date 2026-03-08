@@ -1,6 +1,7 @@
 {
   "name": "@yrrrrrf/aether",
   "version": "0.1.1",
+  "description": "A type-safe edge client and schema generator for pREST, PostgREST and Supabase.",
   "license": "MIT",
   "exports": {
     ".": "./src/runtime/mod.ts",
