@@ -1,5 +1,5 @@
 import type { QueryFilter, QueryOptions } from "./types.ts";
-import { OPERATOR_MAP } from "./operators.ts";
+import { PREST_OPERATORS } from "./operators.ts";
 import { ValidationError } from "../transport/errors.ts";
 
 function encodeValue(val: unknown): string {
@@ -60,7 +60,7 @@ function processFilter(
       if (isOperatorNode) {
         for (const opKey of keys) {
           const opVal = (value as Record<string, unknown>)[opKey];
-          const config = OPERATOR_MAP[opKey];
+          const config = PREST_OPERATORS[opKey];
 
           if (config) {
             let formattedVal = "";
@@ -139,3 +139,5 @@ export function buildUrl(
   const queryString = params.join("&");
   return `/${schema}/${table}${queryString ? "?" + queryString : ""}`;
 }
+
+export { buildPostgrestUrl } from "../dialects/postgrest.ts";

@@ -3,6 +3,7 @@ export {
   type QueryFilter,
   type QueryOptions,
   type TableOperations,
+  type ViewOperations,
 } from "./dsl/types.ts";
 export {
   AetherError,

@@ -28,10 +28,18 @@ export interface QueryFilter {
 export interface QueryOptions<T = any> {
   select?: string[];
   where?: QueryFilter;
-  order?: string[] | Record<string, "asc" | "desc">;
+  order?:
+    | string[]
+    | Record<
+      string,
+      "asc" | "desc" | { dir: "asc" | "desc"; nulls?: "first" | "last" }
+    >;
   limit?: number;
   offset?: number;
   single?: boolean;
+  embed?: Record<string, QueryOptions | true>;
+  count?: "exact" | "planned" | "estimated";
+  textSearch?: { column: string; query: string; config?: string };
 }
 
 export interface ViewOperations<T = unknown, R = unknown> {

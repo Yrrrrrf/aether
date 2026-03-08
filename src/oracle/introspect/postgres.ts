@@ -9,9 +9,11 @@ import type {
 
 export class PostgresIntrospector {
   private client: Client;
+  private mode?: string;
 
-  constructor(connectionString: string) {
+  constructor(connectionString: string, mode?: string) {
     this.client = new Client(connectionString);
+    this.mode = mode;
   }
 
   async connect() {
@@ -57,6 +59,13 @@ export class PostgresIntrospector {
   }
 
   private async getTables(): Promise<Table[]> {
+    let schemaExclusions = "'information_schema', 'pg_catalog'";
+    if (this.mode === "supabase") {
+      const supabaseInternal =
+        ",'auth', 'storage', 'realtime', 'extensions', 'supabase_functions', '_realtime', 'pgsodium', 'vault'";
+      schemaExclusions += supabaseInternal;
+    }
+
     // 1. Get Tables and Views
     const tablesResult = await this.client.queryObject<{
       schema: string;
@@ -68,7 +77,7 @@ export class PostgresIntrospector {
         table_name as name,
         table_type as kind
       FROM information_schema.tables
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+      WHERE table_schema NOT IN (${schemaExclusions})
     `);
 
     const tables: Table[] = [];

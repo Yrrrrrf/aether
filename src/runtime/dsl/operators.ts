@@ -5,7 +5,7 @@ export interface OperatorConfig {
   format: OperatorFormat;
 }
 
-export const OPERATOR_MAP: Record<string, OperatorConfig> = {
+export const PREST_OPERATORS: Record<string, OperatorConfig> = {
   // pREST requires '$' prefix for operators
   $eq: { token: "$eq", format: "scalar" },
   $gt: { token: "$gt", format: "scalar" },
@@ -37,4 +37,34 @@ export const OPERATOR_MAP: Record<string, OperatorConfig> = {
   $not: { token: "$not", format: "scalar" },
   $or: { token: "$or", format: "parens" },
   $and: { token: "$and", format: "parens" },
+};
+
+export const POSTGREST_OPERATORS: Record<string, OperatorConfig> = {
+  // PostgREST does NOT use '$' prefix for operators
+  $eq: { token: "eq", format: "scalar" },
+  $gt: { token: "gt", format: "scalar" },
+  $gte: { token: "gte", format: "scalar" },
+  $lt: { token: "lt", format: "scalar" },
+  $lte: { token: "lte", format: "scalar" },
+  $neq: { token: "neq", format: "scalar" }, // PostgREST uses neq
+  $like: { token: "like", format: "scalar" },
+  $ilike: { token: "ilike", format: "scalar" },
+
+  $is: { token: "is", format: "scalar" }, // PostgREST uses is.null
+
+  $in: { token: "in", format: "parens" },
+  "$not.in": { token: "not.in", format: "parens" },
+
+  $cs: { token: "cs", format: "braces" },
+  $cd: { token: "cd", format: "braces" },
+  $ov: { token: "ov", format: "braces" },
+  $sl: { token: "sl", format: "braces" },
+  $sr: { token: "sr", format: "braces" },
+  $nxr: { token: "nxr", format: "braces" },
+  $nxl: { token: "nxl", format: "braces" },
+  $adj: { token: "adj", format: "braces" },
+
+  $not: { token: "not", format: "scalar" },
+  $or: { token: "or", format: "parens" },
+  $and: { token: "and", format: "parens" },
 };

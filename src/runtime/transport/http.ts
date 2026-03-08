@@ -10,16 +10,22 @@ export interface FetchOptions {
 }
 
 export class Carrier {
+  private getHeaders: () => Record<string, string>;
+
   constructor(
     private readonly baseUrl: string,
-    private readonly globalHeaders: Record<string, string> = {},
-  ) {}
+    globalHeaders: Record<string, string> | (() => Record<string, string>) = {},
+  ) {
+    this.getHeaders = typeof globalHeaders === "function"
+      ? globalHeaders
+      : () => globalHeaders;
+  }
 
   async request<T>(path: string, options: FetchOptions = {}): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers = {
       "Content-Type": "application/json",
-      ...this.globalHeaders,
+      ...this.getHeaders(),
       ...options.headers,
     };
 

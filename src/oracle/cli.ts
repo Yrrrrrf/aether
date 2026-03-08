@@ -5,20 +5,20 @@ import { generateZod } from "./emitters/zod.ts";
 
 async function main() {
   const flags = parseArgs(Deno.args, {
-    string: ["url", "out", "zod-out"],
-    default: { out: "./src/aether.d.ts" },
+    string: ["url", "out", "zod-out", "mode", "schema"],
+    default: { out: "./src/aether.d.ts", mode: "standard" },
   });
 
   if (!flags.url) {
     console.error("Error: --url is required.");
     console.error(
-      "Usage: deno task generate --url=<postgres_url> [--out=<path>] [--zod-out=<path>]",
+      "Usage: deno task generate --url=<postgres_url> [--mode=<supabase>] [--out=<path>] [--zod-out=<path>]",
     );
     Deno.exit(1);
   }
 
   console.log(`🔮 Oracle: Connecting to ${flags.url}...`);
-  const oracle = new PostgresIntrospector(flags.url);
+  const oracle = new PostgresIntrospector(flags.url, flags.mode);
 
   try {
     await oracle.connect();

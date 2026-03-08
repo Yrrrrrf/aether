@@ -105,19 +105,23 @@ export async function withTestEnv(
   name: string,
   fn: (ctx: TestContext) => Promise<void>,
 ) {
-  Deno.test(name, async () => {
-    // 1. Setup
-    await waitForService();
-    await seedDatabase();
+  Deno.test({
+    name,
+    ignore: Deno.env.get("TEST_PREST") !== "1",
+    fn: async () => {
+      // 1. Setup
+      await waitForService();
+      await seedDatabase();
 
-    // 2. Create Client
-    const db = createAether<any>({ baseUrl: PGRST_API });
+      // 2. Create Client
+      const db = createAether<any>({ baseUrl: PGRST_API });
 
-    // 3. Run User Test
-    await fn({
-      db,
-      seed: seedDatabase,
-      generate: generateTypes,
-    });
+      // 3. Run User Test
+      await fn({
+        db,
+        seed: seedDatabase,
+        generate: generateTypes,
+      });
+    },
   });
 }

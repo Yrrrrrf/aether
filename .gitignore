@@ -7,4 +7,4 @@
 
 # TS-generated files
 # ignore the generated schema file (if it exists)
-**/generated_schema.d.ts
+**/gen_schemas.d.ts
