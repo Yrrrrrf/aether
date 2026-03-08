@@ -9,6 +9,7 @@ export {
   type QueryOptions,
   type TableOperations,
   type ViewOperations,
+  type WithEmbed,
 } from "./dsl/types.ts";
 
 export {

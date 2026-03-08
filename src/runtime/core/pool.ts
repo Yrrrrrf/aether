@@ -2,6 +2,9 @@ import type { AetherConfig } from "./fabric.ts";
 import { createAether } from "./fabric.ts";
 import type { AuthProvider } from "../auth/types.ts";
 
+/**
+ * Represents a collection of Aether database clients mapped to keys.
+ */
 export type Pool<T> = T & {
   /**
    * Injects a shared AuthProvider into all pool clients simultaneously.

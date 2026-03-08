@@ -2,6 +2,14 @@ import type { DatabaseSchema, Table } from "../ast/types.ts";
 import { mapPostgresTypeToTs } from "../ast/mapper.ts";
 import { toInterfaceName, toPascalCase } from "../utils.ts";
 
+/**
+ * Generates TypeScript interfaces and a unified DB map from a parsed DatabaseSchema.
+ *
+ * @param schema - The introspected database schema.
+ * @param importFrom - The module path to import Aether runtime types from.
+ * @param includeComments - Whether to include database comments in the generated output.
+ * @returns The generated TypeScript source code.
+ */
 export function generateTypeScript(
   schema: DatabaseSchema,
   importFrom = "@yrrrrrf/aether",

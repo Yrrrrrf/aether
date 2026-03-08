@@ -6,16 +6,24 @@ import { ValidationError } from "../transport/errors.ts";
 import type { AuthProvider } from "../auth/types.ts";
 import type { ValidationStrategy } from "../validation/types.ts";
 
+/**
+ * Configuration options for initializing an Aether client.
+ */
 export interface AetherConfig {
+  /** The base URL of the database API (e.g. Supabase REST URL) */
   baseUrl: string;
+  /** Optional static headers to append to every request */
   headers?: Record<string, string>;
+  /** The backend SQL dialect API format */
   dialect?: "prest" | "postgrest" | "supabase";
+  /** Optional static API key (sent as 'apikey' header) */
   apiKey?: string;
-
+  /** Dynamic authentication provider for JWTs */
   auth?: AuthProvider;
-
+  /** Client-side validation strategies mapped by table name */
   // deno-lint-ignore no-explicit-any
   validators?: Record<string, ValidationStrategy<any>>;
+  /** The default database schema to target */
   schema?: string;
 }
 
@@ -36,6 +44,13 @@ export function resolveWriteHeaders(
   return headers;
 }
 
+/**
+ * Factory function to create a new type-safe Aether database client.
+ *
+ * @typeParam DB - The generated Database interface from the Oracle.
+ * @param rawConfig - Configuration for the client.
+ * @returns A Proxy-based client matching the DB schema.
+ */
 export function createAether<DB>(rawConfig: AetherConfig): DB {
   const config = { ...rawConfig };
 

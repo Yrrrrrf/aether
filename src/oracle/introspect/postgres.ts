@@ -7,29 +7,50 @@ import type {
   Table,
 } from "../ast/types.ts";
 
+/**
+ * Connects to a PostgreSQL database and extracts its schema, tables, columns, and relations.
+ */
 export class PostgresIntrospector {
   private client: Client;
   private mode?: string;
 
+  /**
+   * Creates a new PostgresIntrospector instance.
+   * @param connectionString - A postgres:// URL.
+   * @param mode - Optional dialect mode (e.g. 'supabase' to filter internal schemas).
+   */
   constructor(connectionString: string, mode?: string) {
     this.client = new Client(connectionString);
     this.mode = mode;
   }
 
+  /**
+   * Connects to the database using the provided connection string.
+   */
   async connect() {
     await this.client.connect();
   }
 
+  /**
+   * Closes the active database connection.
+   */
   async close() {
     await this.client.end();
   }
 
+  /**
+   * Extracts the full DatabaseSchema including tables, views, columns, foreign keys, and enums.
+   * @returns The generated DatabaseSchema.
+   */
   async introspect(): Promise<DatabaseSchema> {
     const enums = await this.getEnums();
     const tables = await this.getTables();
     return { tables, enums };
   }
 
+  /**
+   * Retrieves all PostgreSQL enumerations from pg_type.
+   */
   private async getEnums(): Promise<Enum[]> {
     const result = await this.client.queryObject<{
       schema: string;
@@ -58,6 +79,9 @@ export class PostgresIntrospector {
     return Object.values(enums);
   }
 
+  /**
+   * Introspects tables, views, columns, and foreign keys from information_schema.
+   */
   private async getTables(): Promise<Table[]> {
     let schemaExclusions = "'information_schema', 'pg_catalog'";
     if (this.mode === "supabase") {

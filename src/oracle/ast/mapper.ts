@@ -1,3 +1,11 @@
+/**
+ * Maps PostgreSQL data types to TypeScript types.
+ *
+ * @param dataType - The PostgreSQL data type (e.g., 'integer', 'text').
+ * @param udtName - The user-defined type name (useful for enums or arrays).
+ * @param _enums - A set of known enum names in the schema.
+ * @returns The corresponding TypeScript type string.
+ */
 export function mapPostgresTypeToTs(
   dataType: string,
   udtName: string,

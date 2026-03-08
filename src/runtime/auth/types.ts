@@ -1,3 +1,6 @@
+/**
+ * An interface for dynamically injecting authentication tokens into requests.
+ */
 export interface AuthProvider {
   /**
    * Returns the current access token, or null if unauthenticated.
