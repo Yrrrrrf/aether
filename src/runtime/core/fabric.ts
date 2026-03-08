@@ -1,26 +1,53 @@
-import { Carrier } from "../transport/http.ts";
+import { buildTransport } from "../transport/client.ts";
 import { createRecursiveProxy } from "./proxy.ts";
 import { buildPostgrestUrl, buildUrl } from "../dsl/dialect.ts";
 import type { QueryFilter, QueryOptions } from "../dsl/types.ts";
 import { ValidationError } from "../transport/errors.ts";
-import {
-  isPostgrestDialect,
-  resolveAuthHeaders,
-  resolveWriteHeaders,
-} from "../transport/auth.ts";
+import type { AuthProvider } from "../auth/types.ts";
+import { tokenAdapter } from "../auth/adapters.ts";
+import type { ValidationStrategy } from "../validation/types.ts";
 
 export interface AetherConfig {
   baseUrl: string;
   headers?: Record<string, string>;
   dialect?: "prest" | "postgrest" | "supabase";
   apiKey?: string;
-  getAccessToken?: () => string | null;
+
+  /** @deprecated use `auth` instead */
+  getAccessToken?: () => string | null | Promise<string | null>;
+
+  auth?: AuthProvider;
+  validate?: ValidationStrategy;
   schema?: string;
 }
 
-export function createAether<DB>(config: AetherConfig): DB {
+export function isPostgrestDialect(config: AetherConfig): boolean {
+  return config.dialect === "postgrest" || config.dialect === "supabase" ||
+    !!config.apiKey;
+}
+
+export function resolveWriteHeaders(
+  config: AetherConfig,
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (isPostgrestDialect(config)) {
+    headers["Prefer"] = "return=representation";
+    if (config.schema && config.schema !== "public") {
+      headers["Content-Profile"] = config.schema;
+    }
+  }
+  return headers;
+}
+
+export function createAether<DB>(rawConfig: AetherConfig): DB {
+  const config = { ...rawConfig };
+  // v1 compatibility shim
+  if (config.getAccessToken && !config.auth) {
+    config.auth = tokenAdapter(config.getAccessToken);
+  }
+
   const isPostgrest = isPostgrestDialect(config);
-  const carrier = new Carrier(config.baseUrl, () => resolveAuthHeaders(config));
+  const request = buildTransport(config);
   const writeHeaders = resolveWriteHeaders(config);
 
   return createRecursiveProxy(async (path, args) => {
@@ -39,7 +66,7 @@ export function createAether<DB>(config: AetherConfig): DB {
         if (!CRUD_METHODS.has(lastSegment)) {
           const fnName = lastSegment;
           const payload = args[0];
-          return carrier.request(`/rpc/${fnName}`, {
+          return request(`/rpc/${fnName}`, {
             method: "POST",
             body: payload,
           });
@@ -50,7 +77,7 @@ export function createAether<DB>(config: AetherConfig): DB {
         const namespace = path[1];
         const fnName = path[2];
         const payload = args[0];
-        return carrier.request(`/_plugins/${namespace}/${fnName}`, {
+        return request(`/_plugins/${namespace}/${fnName}`, {
           method: "POST",
           body: payload,
         });
@@ -63,13 +90,18 @@ export function createAether<DB>(config: AetherConfig): DB {
     const table = path[path.length - 2];
     const schema = path[path.length - 3];
 
+    // deno-lint-ignore no-explicit-any
+    let result: any;
+
     switch (method) {
       case "findMany": {
         const options = args[0] as QueryOptions | undefined;
         const url = isPostgrest
           ? buildPostgrestUrl(table, options)
           : buildUrl(schema, table, options);
-        return carrier.request(url, { method: "GET" });
+        result = await request(url, { method: "GET" });
+        if (options?.validate) result = options.validate.parse(result);
+        break;
       }
       case "findOne": {
         const options = args[0] as QueryOptions | undefined;
@@ -77,26 +109,35 @@ export function createAether<DB>(config: AetherConfig): DB {
         const url = isPostgrest
           ? buildPostgrestUrl(table, { ...options, limit: 1 })
           : buildUrl(schema, table, { ...options, limit: 1 });
-        const result = await carrier.request<unknown[]>(url, { method: "GET" });
+        const list = await request<unknown[]>(url, { method: "GET" });
 
         // UNWRAP: Always return single object or null
-        if (Array.isArray(result)) {
-          return result.length > 0 ? result[0] : null;
+        if (Array.isArray(list)) {
+          result = list.length > 0 ? list[0] : null;
+        } else {
+          result = list;
         }
-        return result;
+        if (result && options?.validate) {
+          result = options.validate.parse(result);
+        }
+        break;
       }
       case "create": {
         const data = args[0];
         const url = isPostgrest ? `/${table}` : `/${schema}/${table}`;
-        const result = await carrier.request(url, {
+        const createResult = await request(url, {
           method: "POST",
           body: data,
           headers: writeHeaders,
         });
 
         // NORMALIZE: Ensure we always return an Array T[]
-        if (result === null) return [];
-        return Array.isArray(result) ? result : [result];
+        if (createResult === null) {
+          result = [];
+        } else {
+          result = Array.isArray(createResult) ? createResult : [createResult];
+        }
+        break;
       }
       case "update": {
         const filter = args[0] as QueryFilter;
@@ -109,15 +150,19 @@ export function createAether<DB>(config: AetherConfig): DB {
           ? buildPostgrestUrl(table, { where: filter })
           : buildUrl(schema, table, { where: filter });
 
-        const result = await carrier.request(url, {
+        const updateResult = await request(url, {
           method: "PATCH",
           body: data,
           headers: writeHeaders,
         });
 
         // NORMALIZE: Ensure Array T[]
-        if (result === null) return [];
-        return Array.isArray(result) ? result : [result];
+        if (updateResult === null) {
+          result = [];
+        } else {
+          result = Array.isArray(updateResult) ? updateResult : [updateResult];
+        }
+        break;
       }
       case "delete": {
         const filter = args[0] as QueryFilter;
@@ -129,10 +174,22 @@ export function createAether<DB>(config: AetherConfig): DB {
           ? buildPostgrestUrl(table, { where: filter })
           : buildUrl(schema, table, { where: filter });
 
-        return carrier.request(url, { method: "DELETE" });
+        result = await request(url, { method: "DELETE" });
+        break;
       }
       default:
         throw new Error(`Unknown method: ${method}`);
     }
+
+    // Global validation
+    if (config.validate && result !== null) {
+      if (Array.isArray(result)) {
+        result = result.map((item) => config.validate!.parse(item));
+      } else {
+        result = config.validate.parse(result);
+      }
+    }
+
+    return result;
   }) as DB;
 }

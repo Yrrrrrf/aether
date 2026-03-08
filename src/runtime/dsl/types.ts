@@ -1,3 +1,5 @@
+import type { ValidationStrategy } from "../validation/types.ts";
+
 export type Operator =
   | "$eq"
   | "$gt"
@@ -40,11 +42,25 @@ export interface QueryOptions<T = unknown> {
   embed?: Record<string, QueryOptions | true>;
   count?: "exact" | "planned" | "estimated";
   textSearch?: { column: string; query: string; config?: string };
+  validate?: ValidationStrategy;
 }
 
+export type WithEmbed<T, R, O> = O extends { embed: infer E }
+  // deno-lint-ignore no-explicit-any
+  ? E extends Record<string, any> ?
+      & T
+      & Omit<R, keyof E>
+      & { [K in Extract<keyof E, keyof R>]-?: NonNullable<R[K]> }
+  : T & R
+  : T & Partial<R>;
+
 export interface ViewOperations<T = unknown, R = unknown> {
-  findMany(query?: QueryOptions<T>): Promise<(T & R)[]>;
-  findOne(query?: QueryOptions<T>): Promise<(T & R) | null>;
+  findMany<O extends QueryOptions<T> = QueryOptions<T>>(
+    query?: O,
+  ): Promise<WithEmbed<T, R, O>[]>;
+  findOne<O extends QueryOptions<T> = QueryOptions<T>>(
+    query?: O,
+  ): Promise<WithEmbed<T, R, O> | null>;
 }
 
 export interface TableOperations<T = unknown, R = unknown>

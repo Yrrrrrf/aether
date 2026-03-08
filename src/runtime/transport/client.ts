@@ -1,0 +1,101 @@
+import { ResponseError, up } from "npm:up-fetch@^2.5.1";
+import type { AetherConfig } from "../core/fabric.ts";
+import { ApiError, NetworkError } from "./errors.ts";
+
+export type FetchOptions = {
+  headers?: Record<string, string>;
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  body?: unknown;
+  signal?: AbortSignal;
+};
+
+export async function resolveClientHeaders(
+  config: AetherConfig,
+): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...config.headers,
+  };
+
+  if (config.apiKey) {
+    headers["apikey"] = config.apiKey;
+  }
+
+  if (config.auth) {
+    const token = await config.auth.getAccessToken();
+    if (token !== null) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
+  if (config.schema && config.schema !== "public") {
+    headers["Accept-Profile"] = config.schema;
+    headers["Content-Profile"] = config.schema;
+  }
+
+  return headers;
+}
+
+export function buildTransport(config: AetherConfig) {
+  const upFetch = up(fetch, async () => {
+    const headers = await resolveClientHeaders(config);
+
+    return {
+      baseUrl: config.baseUrl,
+      headers,
+      retries: 3,
+      retryDelay: (attempt: number) => {
+        let delay = Math.min(200 * Math.pow(2, attempt), 2000);
+        delay = delay * (0.5 + Math.random());
+        return delay;
+      },
+      // deno-lint-ignore no-explicit-any
+      retryOn: (error: any) => {
+        if (error instanceof ResponseError) {
+          return error.response.status === 503 || error.response.status === 504;
+        }
+        return true;
+      },
+      // deno-lint-ignore no-explicit-any
+      serialize: (body: any) =>
+        JSON.stringify(
+          body,
+          (_, v) => typeof v === "bigint" ? v.toString() : v,
+        ),
+      parseResponse: async (response: Response) => {
+        if (response.status === 204) return null;
+        const text = await response.text();
+        if (!text) return null;
+
+        const safeText = text.replace(/"([^"]+)":\s*(\d{15,})/g, '"$1": "$2"');
+        return JSON.parse(safeText);
+      },
+    };
+  });
+
+  return async <T>(path: string, options: FetchOptions = {}): Promise<T> => {
+    try {
+      // We pass the path; baseUrl is handled by up-fetch
+      // options body will be auto-serialized
+      // deno-lint-ignore no-explicit-any
+      return (await upFetch(path, options as any)) as T;
+    } catch (err) {
+      // deno-lint-ignore no-explicit-any
+      const error = err as any;
+      if (error instanceof ResponseError) {
+        throw new ApiError(
+          error.response.status,
+          error.response.statusText,
+          error.data ?? await error.response.text().catch(() => ""),
+        );
+      }
+      if (error instanceof ApiError || error instanceof NetworkError) {
+        throw error;
+      }
+      throw new NetworkError(
+        error instanceof Error ? error.message : "Unknown",
+        error,
+      );
+    }
+  };
+}

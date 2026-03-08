@@ -1,64 +1,65 @@
 import { assertEquals, assertFalse } from "@std/assert";
-import {
-  resolveAuthHeaders,
-  resolveWriteHeaders,
-} from "../../src/runtime/transport/auth.ts";
+import { resolveClientHeaders } from "../../src/runtime/transport/client.ts";
+import { resolveWriteHeaders } from "../../src/runtime/core/fabric.ts";
 import type { AetherConfig } from "../../src/runtime/core/fabric.ts";
+import { tokenAdapter } from "../../src/runtime/auth/adapters.ts";
 
-Deno.test("Auth Headers - API Key Only", () => {
+Deno.test("Auth Headers - API Key Only", async () => {
   const config: AetherConfig = {
     baseUrl: "http://localhost:3000",
     dialect: "supabase",
     apiKey: "test-key",
   };
-  const headers = resolveAuthHeaders(config);
+  const headers = await resolveClientHeaders(config);
   assertEquals(headers["apikey"], "test-key");
   assertFalse("Authorization" in headers);
 });
 
-Deno.test("Auth Headers - API Key + JWT", () => {
+Deno.test("Auth Headers - API Key + JWT", async () => {
   const config: AetherConfig = {
     baseUrl: "http://localhost:3000",
     dialect: "supabase",
     apiKey: "test-key",
-    getAccessToken: () => "jwt-token",
+    auth: tokenAdapter(() => "jwt-token"),
   };
-  const headers = resolveAuthHeaders(config);
+  const headers = await resolveClientHeaders(config);
   assertEquals(headers["apikey"], "test-key");
   assertEquals(headers["Authorization"], "Bearer jwt-token");
 });
 
-Deno.test("Auth Headers - JWT is Null", () => {
+Deno.test("Auth Headers - JWT is Null", async () => {
   const config: AetherConfig = {
     baseUrl: "http://localhost:3000",
     dialect: "supabase",
     apiKey: "test-key",
-    getAccessToken: () => null,
+    auth: tokenAdapter(() => null),
   };
-  const headers = resolveAuthHeaders(config);
+  const headers = await resolveClientHeaders(config);
   assertEquals(headers["apikey"], "test-key");
   assertFalse("Authorization" in headers);
 });
 
-Deno.test("Auth Headers - Schema Private", () => {
+Deno.test("Auth Headers - Schema Private", async () => {
   const config: AetherConfig = {
     baseUrl: "http://localhost:3000",
     dialect: "postgrest",
     schema: "private",
   };
-  const headers = resolveAuthHeaders(config);
+  const headers = await resolveClientHeaders(config);
   assertEquals(headers["Accept-Profile"], "private");
 });
 
-Deno.test("Auth Headers - No PostgREST Config (pREST fallback)", () => {
+Deno.test("Auth Headers - No PostgREST Config (pREST fallback)", async () => {
   const config: AetherConfig = {
     baseUrl: "http://localhost:3000",
   };
-  const headers = resolveAuthHeaders(config);
-  assertEquals(Object.keys(headers).length, 0);
+  const headers = await resolveClientHeaders(config);
+  // Content-Type application/json is always injected by builder natively but we test what resolves
+  assertEquals(headers["Content-Type"], "application/json");
+  assertFalse("apikey" in headers);
 });
 
-Deno.test("Auth Headers - Includes Custom Headers", () => {
+Deno.test("Auth Headers - Includes Custom Headers", async () => {
   const config: AetherConfig = {
     baseUrl: "http://localhost:3000",
     dialect: "supabase",
@@ -67,7 +68,7 @@ Deno.test("Auth Headers - Includes Custom Headers", () => {
       "X-Custom-Token": "hello",
     },
   };
-  const headers = resolveAuthHeaders(config);
+  const headers = await resolveClientHeaders(config);
   assertEquals(headers["apikey"], "test-key");
   assertEquals(headers["X-Custom-Token"], "hello");
 });
