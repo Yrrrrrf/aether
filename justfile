@@ -21,5 +21,4 @@ test-all prest="0" supabase="1":
 ci:
     deno fmt
     deno lint
-    deno test
-    # just test-all  # default test all
+    just test-all  # default test all
