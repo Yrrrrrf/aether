@@ -3,7 +3,7 @@ import {
   toInterfaceName,
   toPascalCase,
   toSchemaName,
-} from "../../src/oracle/utils.ts";
+} from "../../../src/oracle/utils.ts";
 
 Deno.test("toPascalCase", () => {
   assertEquals(toPascalCase("users"), "Users");

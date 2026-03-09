@@ -45,7 +45,8 @@ export class PostgresIntrospector {
   async introspect(): Promise<DatabaseSchema> {
     const enums = await this.getEnums();
     const tables = await this.getTables();
-    return { tables, enums };
+    const functions = await this.getFunctions();
+    return { tables, enums, functions };
   }
 
   /**
@@ -77,6 +78,120 @@ export class PostgresIntrospector {
     }
 
     return Object.values(enums);
+  }
+
+  /**
+   * Parses standard PostgreSQL function signature arguments into a structured AST mapping array.
+   * Maps default usages and parameter modalities (IN/OUT/VARIADIC).
+   *
+   * @param argsStr - The raw string of arguments from `pg_get_function_identity_arguments`.
+   * @returns An array of parsed function parameters.
+   */
+  private parseParams(argsStr: string) {
+    if (!argsStr) return [];
+    const parameters: {
+      name: string;
+      type: string;
+      mode: "IN" | "OUT" | "INOUT" | "VARIADIC";
+      hasDefault: boolean;
+    }[] = [];
+
+    for (const arg of argsStr.split(", ")) {
+      const parts = arg.trim().split(" ");
+      if (parts.length === 0 || parts[0] === "") continue;
+
+      let mode = "IN";
+      const firstUpper = parts[0].toUpperCase();
+      if (["IN", "OUT", "INOUT", "VARIADIC"].includes(firstUpper)) {
+        mode = parts.shift()!.toUpperCase();
+      }
+
+      let hasDefault = false;
+      const rejoined = parts.join(" ").toUpperCase();
+      if (rejoined.includes(" DEFAULT ")) {
+        hasDefault = true;
+        const [nameAndType] = parts.join(" ").split(/ default /i);
+        parts.splice(0, parts.length, ...nameAndType.trim().split(" "));
+      }
+
+      const paramType = parts.pop()!;
+      const paramName = parts.length > 0 ? parts.join(" ") : "";
+
+      parameters.push({
+        name: paramName,
+        type: paramType,
+        mode: mode as "IN" | "OUT" | "INOUT" | "VARIADIC",
+        hasDefault,
+      });
+    }
+
+    return parameters;
+  }
+
+  /**
+   * Introspects the active database for all callable functions and stored procedures.
+   * Discards void triggers and internal aggregates, capturing only API-viable RPC footprints.
+   *
+   * @returns An array of metadata describing functions, parameters, and return shapes.
+   */
+  private async getFunctions() {
+    let schemaExclusions = "'information_schema', 'pg_catalog'";
+    if (this.mode === "supabase") {
+      schemaExclusions +=
+        ",'auth', 'storage', 'realtime', 'extensions', 'supabase_functions', '_realtime', 'pgsodium', 'vault'";
+    }
+
+    const query = `
+      WITH func_info AS (
+          SELECT
+              p.oid, n.nspname AS schema, p.proname AS name,
+              pg_get_function_identity_arguments(p.oid) AS arguments,
+              COALESCE(pg_get_function_result(p.oid), 'void') AS return_type,
+              p.prorettype,
+              p.proretset AS returns_set, p.prokind AS kind, d.description
+          FROM pg_proc p
+          JOIN pg_namespace n ON p.pronamespace = n.oid
+          LEFT JOIN pg_description d ON p.oid = d.objoid
+          WHERE n.nspname NOT IN (${schemaExclusions})
+            AND p.prokind IN ('f', 'a', 'w')
+            AND p.prorettype != 'void'::regtype
+            AND NOT EXISTS (
+              SELECT 1 FROM pg_depend dep JOIN pg_extension ext ON dep.refobjid = ext.oid
+              WHERE dep.objid = p.oid
+          )
+      )
+      SELECT * FROM func_info
+      WHERE prorettype NOT IN (
+          'anyelement'::regtype, 'anyarray'::regtype, 'anynonarray'::regtype,
+          'anyenum'::regtype, 'anyrange'::regtype, 'record'::regtype,
+          'trigger'::regtype, 'event_trigger'::regtype, 'internal'::regtype
+      )
+      ORDER BY name;
+    `;
+
+    const result = await this.client.queryObject<{
+      schema: string;
+      name: string;
+      arguments: string;
+      return_type: string;
+      returns_set: boolean;
+      description: string | null;
+    }>(query);
+
+    return result.rows.map((row) => {
+      const isSetReturning = row.returns_set;
+      const isScalar = !isSetReturning && !row.return_type.includes("TABLE");
+
+      return {
+        schema: row.schema,
+        name: row.name,
+        params: this.parseParams(row.arguments),
+        returnType: row.return_type,
+        isSetReturning,
+        isScalar,
+        description: row.description || undefined,
+      };
+    });
   }
 
   /**
@@ -112,6 +227,9 @@ export class PostgresIntrospector {
       is_nullable: string;
       column_default: string | null;
       comment: string | null;
+      character_maximum_length: number | null;
+      numeric_precision: number | null;
+      numeric_scale: number | null;
     }>(`
       SELECT 
         c.table_schema as schema,
@@ -121,6 +239,9 @@ export class PostgresIntrospector {
         c.udt_name,
         c.is_nullable,
         c.column_default,
+        c.character_maximum_length,
+        c.numeric_precision,
+        c.numeric_scale,
         pgd.description as comment
       FROM information_schema.columns c
       LEFT JOIN pg_class cl ON cl.relname = c.table_name 
@@ -193,6 +314,9 @@ export class PostgresIntrospector {
         isNullable: row.is_nullable === "YES",
         hasDefault: row.column_default !== null,
         comment: row.comment || undefined,
+        maxLength: row.character_maximum_length ?? undefined,
+        numericPrecision: row.numeric_precision ?? undefined,
+        numericScale: row.numeric_scale ?? undefined,
       });
     }
 

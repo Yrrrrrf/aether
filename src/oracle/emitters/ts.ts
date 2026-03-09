@@ -14,6 +14,7 @@ export function generateTypeScript(
   schema: DatabaseSchema,
   importFrom = "@yrrrrrf/aether",
   includeComments = true,
+  zodImport?: string,
 ): string {
   const lines: string[] = [];
 
@@ -30,6 +31,12 @@ export function generateTypeScript(
   );
   lines.push(``);
 
+  if (zodImport) {
+    lines.push(`import { z } from "npm:zod";`);
+    lines.push(`import * as Z from "${zodImport}";`);
+    lines.push(``);
+  }
+
   // Enums
   for (const enm of schema.enums) {
     const enumName = toPascalCase(enm.name);
@@ -40,7 +47,7 @@ export function generateTypeScript(
 
   // Tables
   for (const table of schema.tables) {
-    lines.push(...generateTable(table, schema, includeComments));
+    lines.push(...generateTable(table, schema, includeComments, zodImport));
     lines.push(...generateRelations(table, schema));
     lines.push(``);
   }
@@ -55,14 +62,67 @@ export function generateTypeScript(
     for (const t of schemaTables) {
       const interfaceName = toInterfaceName(t.schema, t.name);
       const relationsName = `${interfaceName}Relations`;
-      const wrapper = t.isView ? "ViewOperations" : "TableOperations";
-      lines.push(
-        `    ${t.name}: ${wrapper}<${interfaceName}, ${relationsName}>;`,
-      );
+      if (t.isView) {
+        lines.push(
+          `    ${t.name}: ViewOperations<${interfaceName}, ${relationsName}>;`,
+        );
+      } else {
+        const pkUnion = t.primaryKeys.length > 0
+          ? t.primaryKeys.map((k) => `"${k}"`).join(" | ")
+          : "never";
+        lines.push(
+          `    ${t.name}: TableOperations<${interfaceName}, ${relationsName}, ${pkUnion}>;`,
+        );
+      }
     }
     lines.push(`  };`);
   }
+
+  if (schema.functions && schema.functions.length > 0) {
+    lines.push(`  rpc: RpcFunctions;`);
+  }
+
   lines.push(`}`);
+
+  if (schema.functions && schema.functions.length > 0) {
+    const enumUdtNames = new Set(schema.enums.map((e) => e.name));
+    const fnRows = schema.functions.map((fn) => {
+      const args = fn.params
+        .filter((p) =>
+          p.mode === "IN" || p.mode === "INOUT" || p.mode === "VARIADIC"
+        )
+        .map((p) => {
+          let t = mapPostgresTypeToTs(p.type, p.type, enumUdtNames);
+          const foundEnum = schema.enums.find((e) => e.name === p.type);
+          if (foundEnum) t = toPascalCase(foundEnum.name);
+          return `${p.name || "arg"}${p.hasDefault ? "?" : ""}: ${t}`;
+        })
+        .join(", ");
+
+      let returnTs = mapPostgresTypeToTs(
+        fn.returnType,
+        fn.returnType,
+        enumUdtNames,
+      );
+      const foundRetEnum = schema.enums.find((e) => e.name === fn.returnType);
+      if (foundRetEnum) returnTs = toPascalCase(foundRetEnum.name);
+      if (fn.returnType === "json" || fn.returnType === "jsonb") {
+        returnTs = "Json";
+      }
+
+      const ret = fn.isSetReturning ? `${returnTs}[]` : returnTs;
+      let comment = "";
+      if (includeComments && fn.description) {
+        comment = `\n  /** ${fn.description} */\n`;
+      }
+      return `${comment}  "${fn.schema}.${fn.name}": (${args}) => Promise<${ret}>;`;
+    });
+
+    lines.push(``);
+    lines.push(`export interface RpcFunctions {`);
+    lines.push(...fnRows);
+    lines.push(`}`);
+  }
 
   return lines.join("\n");
 }
@@ -92,50 +152,78 @@ function generateTable(
   table: Table,
   schema: DatabaseSchema,
   includeComments: boolean,
+  zodImport?: string,
 ): string[] {
   const lines: string[] = [];
   const interfaceName = toInterfaceName(table.schema, table.name);
+  const enumUdtNames = new Set(schema.enums.map((e) => e.name));
 
-  lines.push(`export interface ${interfaceName} {`);
-
-  // Foreign Key Comments (The Graph)
-  // We check table.foreignKeys
-  if (table.foreignKeys.length > 0) {
-    lines.push(`  // Relations:`);
-    for (const fk of table.foreignKeys) {
-      lines.push(
-        `  // -> ${fk.column} joins to ${fk.targetSchema}.${fk.targetTable}.${fk.targetColumn}`,
-      );
+  if (zodImport) {
+    if (includeComments) {
+      lines.push(`/** Inferred from Zod Schema */`);
+      // Foreign Key Comments (The Graph)
+      if (table.foreignKeys.length > 0) {
+        lines.push(`// Relations:`);
+        for (const fk of table.foreignKeys) {
+          lines.push(
+            `// -> ${fk.column} joins to ${fk.targetSchema}.${fk.targetTable}.${fk.targetColumn}`,
+          );
+        }
+      }
     }
-  }
-
-  for (const col of table.columns) {
-    // Resolve type
-    let tsType = mapPostgresTypeToTs(col.dataType, col.udtName, new Set());
-
-    // Check if it is an enum
-    const foundEnum = schema.enums.find((e) =>
-      e.name === col.udtName && e.schema === table.schema
+    lines.push(
+      `export type ${interfaceName} = z.infer<typeof Z.${interfaceName}Schema>;`,
     );
-    if (foundEnum) {
-      tsType = toPascalCase(foundEnum.name);
+  } else {
+    lines.push(`export interface ${interfaceName} {`);
+
+    // Foreign Key Comments (The Graph)
+    // We check table.foreignKeys
+    if (table.foreignKeys.length > 0) {
+      lines.push(`  // Relations:`);
+      for (const fk of table.foreignKeys) {
+        lines.push(
+          `  // -> ${fk.column} joins to ${fk.targetSchema}.${fk.targetTable}.${fk.targetColumn}`,
+        );
+      }
     }
 
-    if (col.dataType === "json" || col.dataType === "jsonb") {
-      tsType = "Json";
+    for (const col of table.columns) {
+      // Resolve type
+      let tsType = mapPostgresTypeToTs(col.dataType, col.udtName, enumUdtNames);
+
+      // Check if it is an enum
+      const foundEnum = schema.enums.find((e) =>
+        e.name === col.udtName && e.schema === table.schema
+      );
+      if (foundEnum) {
+        tsType = toPascalCase(foundEnum.name);
+      }
+
+      if (col.dataType === "json" || col.dataType === "jsonb") {
+        tsType = "Json";
+      }
+
+      if (includeComments && col.comment) {
+        lines.push(`  /** ${col.comment} */`);
+      }
+
+      const optionalMark = col.isNullable ? "?" : "";
+      const nullType = col.isNullable ? " | null" : "";
+
+      lines.push(`  ${col.name}${optionalMark}: ${tsType}${nullType};`);
     }
 
-    if (includeComments && col.comment) {
-      lines.push(`  /** ${col.comment} */`);
-    }
-
-    const optionalMark = col.isNullable ? "?" : "";
-    const nullType = col.isNullable ? " | null" : "";
-
-    lines.push(`  ${col.name}${optionalMark}: ${tsType}${nullType};`);
+    lines.push(`}`);
   }
 
-  lines.push(`}`);
+  if (table.primaryKeys.length > 0) {
+    const pkFields = table.primaryKeys.map((k) => `"${k}"`).join(" | ");
+    lines.push(``);
+    lines.push(
+      `export type ${interfaceName}PKFilter = Required<Pick<${interfaceName}, ${pkFields}>>;`,
+    );
+  }
 
   return lines;
 }

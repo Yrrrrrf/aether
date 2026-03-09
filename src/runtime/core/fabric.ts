@@ -1,10 +1,20 @@
 import { buildTransport } from "../transport/client.ts";
 import { createRecursiveProxy } from "./proxy.ts";
-import { buildPostgrestUrl, buildUrl } from "../dsl/dialect.ts";
+import { DIALECTS, type DialectType } from "../dialects/registry.ts";
 import type { QueryFilter, QueryOptions } from "../dsl/types.ts";
-import { ValidationError } from "../transport/errors.ts";
+import { ValidationError, ViewMutationError } from "../transport/errors.ts";
 import type { AuthProvider } from "../auth/types.ts";
 import type { ValidationStrategy } from "../validation/types.ts";
+
+/**
+ * Runtime metadata injected by the Oracle to provide schema awareness.
+ * Used internally to prevent structural errors like mutating read-only views.
+ */
+export interface AetherMeta {
+  readOnlyViews?: ReadonlySet<string>;
+  primaryKeys?: Readonly<Record<string, readonly string[]>>;
+  rpcFunctions?: Readonly<Record<string, { required: readonly string[] }>>;
+}
 
 /**
  * Configuration options for initializing an Aether client.
@@ -15,7 +25,7 @@ export interface AetherConfig {
   /** Optional static headers to append to every request */
   headers?: Record<string, string>;
   /** The backend SQL dialect API format */
-  dialect?: "prest" | "postgrest" | "supabase";
+  dialect?: DialectType;
   /** Optional static API key (sent as 'apikey' header) */
   apiKey?: string;
   /** Dynamic authentication provider for JWTs */
@@ -25,17 +35,24 @@ export interface AetherConfig {
   validators?: Record<string, ValidationStrategy<any>>;
   /** The default database schema to target */
   schema?: string;
+  /** Schema facts injected by the Oracle meta file */
+  meta?: AetherMeta;
 }
 
-export function isPostgrestDialect(config: AetherConfig): boolean {
-  return config.dialect === "postgrest" || config.dialect === "supabase";
-}
-
+/**
+ * Determines and returns the necessary HTTP headers for mutating database operations.
+ *
+ * @param config - The Aether configuration object.
+ * @returns A record of HTTP headers (e.g., `Prefer: return=representation`).
+ */
 export function resolveWriteHeaders(
   config: AetherConfig,
 ): Record<string, string> {
   const headers: Record<string, string> = {};
-  if (isPostgrestDialect(config)) {
+  const isPostgrest = config.dialect
+    ? DIALECTS[config.dialect].isPostgrest
+    : false;
+  if (isPostgrest) {
     headers["Prefer"] = "return=representation";
     if (config.schema && config.schema !== "public") {
       headers["Content-Profile"] = config.schema;
@@ -43,6 +60,14 @@ export function resolveWriteHeaders(
   }
   return headers;
 }
+
+function assertMutable(schema: string, table: string, meta?: AetherMeta) {
+  if (meta?.readOnlyViews?.has(`${schema}.${table}`)) {
+    throw new ViewMutationError(schema, table);
+  }
+}
+
+// Removed executeWithAuth overlapping wrapper
 
 /**
  * Factory function to create a new type-safe Aether database client.
@@ -54,7 +79,9 @@ export function resolveWriteHeaders(
 export function createAether<DB>(rawConfig: AetherConfig): DB {
   const config = { ...rawConfig };
 
-  const isPostgrest = isPostgrestDialect(config);
+  const dialectType = config.dialect || "prest";
+  const dialectConfig = DIALECTS[dialectType];
+  const isPostgrest = dialectConfig.isPostgrest;
   const request = buildTransport(config);
   const writeHeaders = resolveWriteHeaders(config);
 
@@ -104,18 +131,44 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
     switch (method) {
       case "findMany": {
         const options = args[0] as QueryOptions | undefined;
-        const url = isPostgrest
-          ? buildPostgrestUrl(table, options)
-          : buildUrl(schema, table, options);
-        result = await request(url, { method: "GET" });
+        const url = dialectConfig.buildUrl(schema, table, options);
+
+        const reqHeaders: Record<string, string> = {};
+        if (isPostgrest && options?.count) {
+          reqHeaders["Prefer"] = `count=${options.count}`;
+        }
+
+        const rawResult = await request<unknown>(url, {
+          method: "GET",
+          headers: reqHeaders,
+        });
+
+        const validator = options?.validate ??
+          config.validators?.[`${schema}.${table}`];
+        const applyArrayVal = (data: unknown) => {
+          if (!validator || data === null) return data;
+          if (Array.isArray(data)) return data.map((i) => validator.parse(i));
+          return validator.parse(data);
+        };
+
+        if (
+          options?.count && rawResult && typeof rawResult === "object" &&
+          "data" in rawResult
+        ) {
+          rawResult.data = applyArrayVal(rawResult.data);
+          return rawResult; // Return fully mapped CountedResult
+        }
+
+        result = rawResult;
         break;
       }
       case "findOne": {
         const options = args[0] as QueryOptions | undefined;
         // Force limit 1
-        const url = isPostgrest
-          ? buildPostgrestUrl(table, { ...options, limit: 1 })
-          : buildUrl(schema, table, { ...options, limit: 1 });
+        const url = dialectConfig.buildUrl(schema, table, {
+          ...options,
+          limit: 1,
+        });
         const list = await request<unknown[]>(url, { method: "GET" });
 
         // UNWRAP: Always return single object or null
@@ -127,9 +180,10 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
         break;
       }
       case "create": {
+        assertMutable(schema, table, config.meta);
         const data = args[0];
         const url = isPostgrest ? `/${table}` : `/${schema}/${table}`;
-        const createResult = await request(url, {
+        const createResult = await request<unknown>(url, {
           method: "POST",
           body: data,
           headers: writeHeaders,
@@ -144,17 +198,16 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
         break;
       }
       case "update": {
+        assertMutable(schema, table, config.meta);
         const filter = args[0] as QueryFilter;
         const data = args[1];
         if (!filter || Object.keys(filter).length === 0) {
           throw new ValidationError("Missing filter");
         }
 
-        const url = isPostgrest
-          ? buildPostgrestUrl(table, { where: filter })
-          : buildUrl(schema, table, { where: filter });
+        const url = dialectConfig.buildUrl(schema, table, { where: filter });
 
-        const updateResult = await request(url, {
+        const updateResult = await request<unknown>(url, {
           method: "PATCH",
           body: data,
           headers: writeHeaders,
@@ -169,14 +222,13 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
         break;
       }
       case "delete": {
+        assertMutable(schema, table, config.meta);
         const filter = args[0] as QueryFilter;
         if (!filter || Object.keys(filter).length === 0) {
           throw new ValidationError("Missing filter");
         }
 
-        const url = isPostgrest
-          ? buildPostgrestUrl(table, { where: filter })
-          : buildUrl(schema, table, { where: filter });
+        const url = dialectConfig.buildUrl(schema, table, { where: filter });
 
         result = await request(url, { method: "DELETE" });
         break;
@@ -195,7 +247,8 @@ export function createAether<DB>(rawConfig: AetherConfig): DB {
 
     // deno-lint-ignore no-explicit-any
     const options = args[0] as any;
-    const validator = options?.validate ?? config.validators?.[table];
+    const validator = options?.validate ??
+      config.validators?.[`${schema}.${table}`];
     result = applyValidation(result, validator);
 
     return result;

@@ -2,6 +2,9 @@ import { ResponseError, up } from "npm:up-fetch@^2.5.1";
 import type { AetherConfig } from "../core/fabric.ts";
 import { ApiError, NetworkError } from "./errors.ts";
 
+/**
+ * Options for configuring an individual fetch request via the transport layer.
+ */
 export type FetchOptions = {
   headers?: Record<string, string>;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -9,6 +12,13 @@ export type FetchOptions = {
   signal?: AbortSignal;
 };
 
+/**
+ * Resolves standard authorization and profile headers for API requests.
+ * Evaluates the API key, fetches JWTs dynamically, and sets schema profile routing.
+ *
+ * @param config - The initial Aether configuration object.
+ * @returns A record of HTTP headers to append to requests.
+ */
 export async function resolveClientHeaders(
   config: AetherConfig,
 ): Promise<Record<string, string>> {
@@ -36,6 +46,13 @@ export async function resolveClientHeaders(
   return headers;
 }
 
+/**
+ * Constructs the core fetch transport layer with built-in retry logic,
+ * BigInt precision safety, token refresh handling, and error mapping.
+ *
+ * @param config - The Aether configuration object mapping API locations and keys.
+ * @returns A strictly typed fetch executing function managing interceptors seamlessly.
+ */
 export function buildTransport(config: AetherConfig) {
   const upFetch = up(fetch, async () => {
     const headers = await resolveClientHeaders(config);
@@ -67,11 +84,19 @@ export function buildTransport(config: AetherConfig) {
         const text = await response.text();
         if (!text) return null;
 
-        // Safe BigInt Parsing: Replaces unquoted large numbers (>15 digits) into strings to prevent precision loss.
-        // It strictly avoids false-positives on string variables (like phone numbers) by enforcing no quote marks after the colon.
-        // E.g. "id": 1234567890123456789 -> "id": "1234567890123456789"
+        // Safe BigInt Parsing
         const safeText = text.replace(/"([^"]+)":\s*(\d{15,})/g, '"$1": "$2"');
-        return JSON.parse(safeText);
+        const data = JSON.parse(safeText);
+
+        const contentRange = response.headers.get("Content-Range");
+        if (contentRange) {
+          const match = contentRange.match(/\/(\d+|\*)$/);
+          if (match && match[1] !== "*") {
+            return { data, count: parseInt(match[1], 10) };
+          }
+        }
+
+        return data;
       },
     };
   });

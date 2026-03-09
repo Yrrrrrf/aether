@@ -1,7 +1,7 @@
 import { Client } from "postgres";
-import { createAether } from "../src/runtime/mod.ts";
-import { PostgresIntrospector } from "../src/oracle/mod.ts";
-import { generateTypeScript } from "../src/oracle/emitters/ts.ts";
+import { createAether } from "../../src/runtime/mod.ts";
+import { PostgresIntrospector } from "../../src/oracle/mod.ts";
+import { generateTypeScript } from "../../src/oracle/emitters/ts.ts";
 
 function safeGetEnv(key: string): string | undefined {
   try {

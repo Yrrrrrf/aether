@@ -14,6 +14,12 @@ export interface Column {
   hasDefault: boolean;
   /** Optional database comment/description for the column */
   comment?: string;
+  /** Optional maximum length for character columns */
+  maxLength?: number;
+  /** Optional numeric precision */
+  numericPrecision?: number;
+  /** Optional numeric scale */
+  numericScale?: number;
 }
 
 /**
@@ -60,6 +66,23 @@ export interface Enum {
   values: string[];
 }
 
+export interface FunctionParam {
+  name: string;
+  type: string; // PostgreSQL type string
+  mode: "IN" | "OUT" | "INOUT" | "VARIADIC";
+  hasDefault: boolean;
+}
+
+export interface DbFunction {
+  schema: string;
+  name: string;
+  params: FunctionParam[];
+  returnType: string; // Raw PostgreSQL return type string
+  isSetReturning: boolean; // SETOF → returns array
+  isScalar: boolean;
+  description?: string;
+}
+
 /**
  * The top-level schema map introspected from the database.
  */
@@ -68,4 +91,6 @@ export interface DatabaseSchema {
   tables: Table[];
   /** The list of extracted custom enum types */
   enums: Enum[];
+  /** Optional list of database functions (RPCs) */
+  functions?: DbFunction[];
 }

@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
-import { generateTypeScript } from "../../src/oracle/emitters/ts.ts";
-import { generateZod } from "../../src/oracle/emitters/zod.ts";
-import type { DatabaseSchema } from "../../src/oracle/ast/types.ts";
+import { generateTypeScript } from "../../../src/oracle/emitters/ts.ts";
+import { generateZod } from "../../../src/oracle/emitters/zod.ts";
+import type { DatabaseSchema } from "../../../src/oracle/ast/types.ts";
 
 Deno.test("Oracle Emitters - Naming and Deduplication Snapshot", () => {
   const mockSchema: DatabaseSchema = {
@@ -90,8 +90,8 @@ Deno.test("Oracle Emitters - Naming and Deduplication Snapshot", () => {
     ],
   };
 
-  const tsCode = generateTypeScript(mockSchema, "../../src/runtime/mod.ts");
-  const zodCode = generateZod(mockSchema, "../../src/runtime/mod.ts");
+  const tsCode = generateTypeScript(mockSchema, "../../../src/runtime/mod.ts");
+  const zodCode = generateZod(mockSchema, "../../../src/runtime/mod.ts");
 
   // Type emissions check
   assertEquals(
@@ -113,7 +113,7 @@ Deno.test("Oracle Emitters - Naming and Deduplication Snapshot", () => {
   // DB Record Check
   assertEquals(
     tsCode.includes(
-      "users: TableOperations<PublicUsers, PublicUsersRelations>;",
+      'users: TableOperations<PublicUsers, PublicUsersRelations, "id">;',
     ),
     true,
     "Missing public users TableOps",

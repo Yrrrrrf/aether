@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { buildUrl } from "../../src/runtime/dsl/dialect.ts";
+import { buildUrl } from "../../../../src/runtime/dsl/dialect.ts";
 
 Deno.test("Dialect - Basic Select", () => {
   const url = buildUrl("public", "users", {

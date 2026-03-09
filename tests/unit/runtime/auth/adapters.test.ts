@@ -1,7 +1,7 @@
 import { assertEquals, assertFalse } from "@std/assert";
-import { resolveClientHeaders } from "../../src/runtime/transport/client.ts";
-import { resolveWriteHeaders } from "../../src/runtime/core/fabric.ts";
-import type { AetherConfig } from "../../src/runtime/core/fabric.ts";
+import { resolveClientHeaders } from "../../../../src/runtime/transport/client.ts";
+import { resolveWriteHeaders } from "../../../../src/runtime/core/fabric.ts";
+import type { AetherConfig } from "../../../../src/runtime/core/fabric.ts";
 
 Deno.test("Auth Headers - API Key Only", async () => {
   const config: AetherConfig = {

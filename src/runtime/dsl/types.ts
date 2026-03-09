@@ -50,14 +50,53 @@ export type Operator =
   | "$adj"
   | "$not"
   | "$or"
-  | "$and";
+  | "$and"
+  | "$fts"
+  | "$wfts";
+
+export type ScalarFilter<T> =
+  | { $eq: T }
+  | { $neq: T }
+  | { $gt: T }
+  | { $gte: T }
+  | { $lt: T }
+  | { $lte: T }
+  | { $like: string }
+  | { $ilike: string }
+  | { $fts: string }
+  | { $wfts: string }
+  | { $is: "null" | "unknown" | "true" | "false" };
+
+export type ArrayFilter<T> =
+  | { $in: T[] }
+  | { $cs: T[] }
+  | { $cd: T[] }
+  | { $ov: T[] };
+
+export type LogicalFilter<T> =
+  | { $or: QueryFilter<T>[] }
+  | { $and: QueryFilter<T>[] }
+  | { $not: QueryFilter<T> };
+
+export type FieldFilter<T> = T extends (infer U)[] ? ArrayFilter<U>
+  : T extends string | number | boolean ? ScalarFilter<T>
+  : unknown;
 
 /**
  * Represents a recursive filter object compatible with the DSL.
  */
-export interface QueryFilter {
-  /** Nested logical or operator filter values */
-  [key: string]: unknown | Record<string, unknown> | QueryFilter[];
+// deno-lint-ignore no-explicit-any
+export type QueryFilter<T = any> =
+  & {
+    [K in keyof T]?: T[K] | FieldFilter<T[K]>;
+  }
+  & Partial<LogicalFilter<T>>;
+
+export type CountStrategy = "exact" | "planned" | "estimated";
+
+export interface CountedResult<T> {
+  data: T[];
+  count: number | null;
 }
 
 /**
@@ -84,9 +123,9 @@ export interface QueryOptions<T = unknown> {
   /** Eager-loading rules mapping relation keys to QueryOptions */
   embed?: Record<string, QueryOptions | true>;
   /** Return total record count using specific strategies */
-  count?: "exact" | "planned" | "estimated";
+  count?: CountStrategy;
   /** Full-text search configuration */
-  textSearch?: { column: string; query: string; config?: string };
+  textSearch?: { column: keyof T; query: string; config?: string };
   /** Validation strategy overrides for this specific query */
   validate?: ValidationStrategy<T>;
 }
@@ -130,8 +169,11 @@ export interface ViewOperations<T = unknown, R = unknown> {
 /**
  * Read and write operations available on database Tables.
  */
-export interface TableOperations<T = unknown, R = unknown>
-  extends ViewOperations<T, R> {
+export interface TableOperations<
+  T = unknown,
+  R = unknown,
+  PK extends keyof T = never,
+> extends ViewOperations<T, R> {
   /**
    * Inserts one or more new rows into the table.
    * @param data - The row(s) to insert.
@@ -142,10 +184,15 @@ export interface TableOperations<T = unknown, R = unknown>
    * @param filter - The condition to match rows for update.
    * @param data - The partial data to apply.
    */
-  update(filter: QueryFilter, data: Partial<T>): Promise<T[]>;
+  update(
+    filter: [PK] extends [never] ? QueryFilter<T> : Pick<T, PK>,
+    data: Partial<Omit<T, PK>>,
+  ): Promise<T[]>;
   /**
    * Deletes rows matching the specified filter.
    * @param filter - The condition to match rows for deletion.
    */
-  delete(filter: QueryFilter): Promise<void>;
+  delete(
+    filter: [PK] extends [never] ? QueryFilter<T> : Pick<T, PK>,
+  ): Promise<void>;
 }

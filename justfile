@@ -3,8 +3,8 @@ set dotenv-load := true
 # Generate types from DB (reads DB_URL from .env)
 [group('oracle')]
 generate:
-    deno run --allow-net --allow-read --allow-write --allow-env src/oracle/cli.ts --url=$DB_URL --out=./src/aether.d.ts
-    @echo "✅ Types generated!"
+    deno run --allow-net --allow-read --allow-write --allow-env src/oracle/cli.ts --url=$DB_URL --out=./src/aether.d.ts --zod-out=./src/aether.zod.ts --meta-out=./src/aether.meta.ts
+    @echo "✅ Types, Zod schemas, and Meta facts generated!"
 
 # Run unit tests (no infra needed)
 [group('test')]
@@ -22,4 +22,4 @@ ci:
     deno fmt
     deno lint
     deno test
-    # just test-all  # defualt test all
+    # just test-all  # default test all

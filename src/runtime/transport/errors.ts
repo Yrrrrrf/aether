@@ -68,3 +68,45 @@ export class ValidationError extends AetherError {
     this.name = "ValidationError";
   }
 }
+
+/**
+ * Thrown when trying to mutate a view.
+ */
+export class ViewMutationError extends AetherError {
+  constructor(schema: string, table: string) {
+    super(
+      `Cannot mutate "${schema}.${table}": this is a read-only database view.\n` +
+        `Hint: Use findMany() or findOne() to query this view.`,
+    );
+    this.name = "ViewMutationError";
+  }
+}
+
+/**
+ * Thrown when required primary key fields are missing in an update/delete filter.
+ */
+export class MissingPrimaryKeyError extends AetherError {
+  constructor(schema: string, table: string, requiredKeys: string[]) {
+    super(
+      `Missing required primary key(s) in filter for "${schema}.${table}".\n` +
+        `Required: ${requiredKeys.map((k) => `"${k}"`).join(", ")}\n` +
+        `Hint: Update/delete filters must include all primary key columns ` +
+        `to prevent accidental full-table mutations.`,
+    );
+    this.name = "MissingPrimaryKeyError";
+  }
+}
+
+/**
+ * Thrown when calling an unknown RPC function.
+ */
+export class UnknownRpcError extends AetherError {
+  constructor(fnName: string, available: string[]) {
+    super(
+      `Unknown RPC function: "${fnName}".\n` +
+        `Available functions: ${available.join(", ")}\n` +
+        `Hint: Re-run "deno task generate" if you've added new database functions.`,
+    );
+    this.name = "UnknownRpcError";
+  }
+}

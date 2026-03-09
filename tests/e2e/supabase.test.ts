@@ -1,5 +1,5 @@
 import { assertEquals, assertExists } from "@std/assert";
-import { TEST_SCHEMA_FILE, withSupabaseEnv } from "./fixtures_supabase.ts";
+import { TEST_SCHEMA_FILE, withSupabaseEnv } from "../fixtures/supabase_env.ts";
 
 // 1. Test the Supabase Oracle Generation
 withSupabaseEnv(
@@ -48,8 +48,9 @@ withSupabaseEnv(
       limit: 1,
     });
 
-    assertEquals(users.length, 1);
-    assertEquals(users[0].username, "alice"); // oldest is charlie but alice is alphabetically first maybe? No order. Just 1.
+    assertEquals(users.data.length, 1);
+    assertEquals(users.count, 2);
+    assertEquals(typeof users.data[0].username, "string"); // Cannot guarantee alice without explicit order
   },
 );
 

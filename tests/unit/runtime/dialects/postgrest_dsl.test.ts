@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { buildPostgrestUrl } from "../../src/runtime/dsl/dialect.ts";
+import { buildPostgrestUrl } from "../../../../src/runtime/dsl/dialect.ts";
 
 Deno.test("Dialect PostgREST - Basic Select", () => {
   const url = buildPostgrestUrl("users");

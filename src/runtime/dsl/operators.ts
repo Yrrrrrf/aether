@@ -37,6 +37,10 @@ export const PREST_OPERATORS: Record<string, OperatorConfig> = {
   $not: { token: "$not", format: "scalar" },
   $or: { token: "$or", format: "parens" },
   $and: { token: "$and", format: "parens" },
+
+  // Full Text Search (Mapped as best effort for pREST if applicable)
+  $fts: { token: "$fts", format: "scalar" },
+  $wfts: { token: "$wfts", format: "scalar" },
 };
 
 export const POSTGREST_OPERATORS: Record<string, OperatorConfig> = {
@@ -67,4 +71,8 @@ export const POSTGREST_OPERATORS: Record<string, OperatorConfig> = {
   $not: { token: "not", format: "scalar" },
   $or: { token: "or", format: "parens" },
   $and: { token: "and", format: "parens" },
+
+  // Full Text Search
+  $fts: { token: "fts", format: "scalar" },
+  $wfts: { token: "wfts", format: "scalar" },
 };

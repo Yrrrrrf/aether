@@ -1,5 +1,5 @@
 import { assertEquals, assertExists } from "@std/assert";
-import { TEST_SCHEMA_FILE, withTestEnv } from "./fixtures.ts";
+import { TEST_SCHEMA_FILE, withTestEnv } from "../fixtures/prest_env.ts";
 
 // 1. Test the Oracle Generation
 withTestEnv("🔮 Oracle: Introspection & Codegen", async ({ generate }) => {

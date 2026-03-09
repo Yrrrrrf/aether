@@ -5,7 +5,16 @@ import { generateZod } from "./emitters/zod.ts";
 
 async function main() {
   const flags = parseArgs(Deno.args, {
-    string: ["url", "out", "zod-out", "mode", "schema", "import-from"],
+    string: [
+      "url",
+      "out",
+      "zod-out",
+      "zod-import",
+      "meta-out",
+      "mode",
+      "schema",
+      "import-from",
+    ],
     boolean: ["include-comments"],
     default: {
       out: "./src/aether.d.ts",
@@ -40,6 +49,7 @@ async function main() {
       schema,
       flags["import-from"],
       flags["include-comments"],
+      flags["zod-import"],
     );
 
     console.log(`💾 Oracle: Writing to ${flags.out}...`);
@@ -50,6 +60,15 @@ async function main() {
       const zodCode = generateZod(schema, flags["import-from"]);
       console.log(`💾 Oracle: Writing Zod schemas to ${flags["zod-out"]}...`);
       await Deno.writeTextFile(flags["zod-out"], zodCode);
+    }
+
+    if (flags["meta-out"]) {
+      console.log("🧠 Oracle: Generating Meta facts...");
+      // dynamically import so it doesn't break if meta emitter is not imported top-level
+      const { generateMeta } = await import("./emitters/meta.ts");
+      const metaCode = generateMeta(schema);
+      console.log(`💾 Oracle: Writing Meta facts to ${flags["meta-out"]}...`);
+      await Deno.writeTextFile(flags["meta-out"], metaCode);
     }
 
     console.log("✅ Oracle: Done.");

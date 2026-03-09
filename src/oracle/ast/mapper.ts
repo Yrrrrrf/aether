@@ -9,26 +9,21 @@
 export function mapPostgresTypeToTs(
   dataType: string,
   udtName: string,
-  _enums: Set<string>, // Set of enum names (schema.name)
+  enums: Set<string>, // Set of enum names (schema.name)
 ): string {
   // Check if it's an array
-  if (dataType === "ARRAY") {
-    // udtName starts with _ for arrays usually, e.g. _int4
-    const innerType = udtName.startsWith("_") ? udtName.slice(1) : udtName;
-    // We need to map the inner type recursively?
-    // This is a naive check. A better way is to look at standard array types.
-    // For now, let's return "unknown[]" if we're unsure, or try to map common ones.
-    if (innerType === "text" || innerType === "varchar") return "string[]";
-    if (innerType === "int4" || innerType === "int8") return "number[]";
-    return "unknown[]";
+  if (dataType === "ARRAY" || udtName.startsWith("_")) {
+    const innerUdtName = udtName.startsWith("_") ? udtName.slice(1) : udtName;
+    const innerType = mapPostgresTypeToTs(innerUdtName, innerUdtName, enums);
+    return `${innerType}[]`;
   }
 
   // Check if it's a known enum
-  // udtName matches the enum name? Note: Postgres might strip schema or not.
-  // In introspection we stored enums as "schema.name".
-  // udtName usually comes as "name" if it's in the search path.
-  // We'll rely on strict matching if possible, but for now check if udtName is in our enum set keys (without schema?)
-  // Actually, let's just use the dataType logic first.
+  if (enums.has(udtName)) {
+    return udtName.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(
+      "",
+    );
+  }
 
   switch (dataType) {
     case "boolean":
@@ -59,10 +54,9 @@ export function mapPostgresTypeToTs(
     case "jsonb":
       return "Json";
     default:
-      // Is it a user-defined type (Enum)?
-      // If we had the schema context, we'd check `schema.udtName`.
-      // For now, return "string" or "unknown".
-      // If we passed the full list of enums, we could check.
-      return "unknown";
+      console.warn(
+        `[Oracle] Unmapped type: dataType="${dataType}", udtName="${udtName}". Falling back to "string".`,
+      );
+      return "string";
   }
 }

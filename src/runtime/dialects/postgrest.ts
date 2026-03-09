@@ -112,6 +112,12 @@ function serializeNode(
   return parts;
 }
 
+/**
+ * Serializes standard top-level filter properties into PostgREST query parameters.
+ *
+ * @param filter - The user-provided DSL query filter representing column operations.
+ * @returns An array of serialized key-value parameter strings.
+ */
 export function serializeTopLevel(filter: QueryFilter): string[] {
   const parts: string[] = [];
   for (const key in filter) {
@@ -120,6 +126,12 @@ export function serializeTopLevel(filter: QueryFilter): string[] {
   return parts;
 }
 
+/**
+ * Serializes grouped filter properties (e.g., inside an $or/$and block) into nested PostgREST syntax.
+ *
+ * @param filter - The inner DSL query filter mapping group statements.
+ * @returns A comma-separated string of serialized parameters formatting recursive depths.
+ */
 export function serializeGrouped(filter: QueryFilter): string {
   const parts: string[] = [];
   for (const key in filter) {
@@ -128,6 +140,13 @@ export function serializeGrouped(filter: QueryFilter): string {
   return parts.join(",");
 }
 
+/**
+ * Constructs a comprehensive PostgREST API URL including selects, filters, ordering, full-text search, and pagination.
+ *
+ * @param table - The target database table or view endpoint.
+ * @param query - The DSL query options shaping the response logic.
+ * @returns The fully formatted query string URL mapping to the database operation.
+ */
 export function buildPostgrestUrl(
   table: string,
   query?: QueryOptions,
@@ -156,6 +175,13 @@ export function buildPostgrestUrl(
 
   // 2. FILTER
   if (query?.where) params.push(...serializeTopLevel(query.where));
+
+  // 2.5 Text Search
+  if (query?.textSearch) {
+    const { column, query: q, config } = query.textSearch;
+    const lang = config ? `(${config})` : "";
+    params.push(`${String(column)}=fts${lang}.${encodeURIComponent(q)}`);
+  }
 
   // 3. ORDER
   if (query?.order) {
